@@ -1,0 +1,182 @@
+"use client";
+
+import * as React from "react";
+import type { Table } from "@tanstack/react-table";
+// import { DataTableViewOptions } from "./data-table-view-options"
+import { DataTableFacetedFilter } from "./data-table-faceted-filter";
+import { DataTableDateRangePicker } from "./data-table-date-range-picker";
+import { Download, Filter, Search, X, Loader2 } from "lucide-react";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+
+interface DataTableToolbarProps<TData> {
+  table: Table<TData>;
+  filterableColumns?: {
+    id: string;
+    title: string;
+    options: {
+      label: string;
+      value: string;
+      icon?: React.ComponentType<{ className?: string }>;
+    }[];
+  }[];
+  searchableColumns?: {
+    id: string;
+    title: string;
+  }[];
+  advancedFilter?: boolean;
+  showCalender?: boolean;
+  showDownload?: boolean;
+  dateRangeFilter?: boolean;
+  dateRange: { from: Date; to: Date };
+  setDateRange: (dateRange: { from: Date; to: Date }) => void;
+  searchPlaceholder?: string;
+  globalFilter: string;
+  setGlobalFilter: (value: string) => void;
+  isLoading?: boolean;
+  showGlobalFilter?: boolean;
+}
+
+export function DataTableToolbar<TData>({
+  table,
+  filterableColumns = [],
+  searchableColumns = [],
+  advancedFilter = true,
+  showCalender = false,
+  showDownload = false,
+  dateRangeFilter = true,
+  dateRange,
+  setDateRange,
+  searchPlaceholder = "Search...",
+  globalFilter,
+  setGlobalFilter,
+  isLoading = false,
+  showGlobalFilter = true,
+}: DataTableToolbarProps<TData>) {
+  const isFiltered =
+    table.getState().columnFilters.length > 0 || globalFilter !== "";
+  const [showFilters, setShowFilters] = React.useState(false);
+  const [searchValue, setSearchValue] = React.useState(globalFilter);
+
+  // Debounce search to avoid excessive API calls
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setGlobalFilter(searchValue);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchValue, setGlobalFilter]);
+
+  // Sync external global filter with internal state
+  React.useEffect(() => {
+    setSearchValue(globalFilter);
+  }, [globalFilter]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 items-center space-y-2 lg:flex lg:space-x-2 lg:space-y-0">
+          {showGlobalFilter && (
+            <div className="relative w-full flex-1 sm:max-w-xl">
+              <Search className="text-muted-foreground absolute left-2.5 top-3 h-4 w-4" />
+              <Input
+              placeholder={searchPlaceholder}
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="placeholder:text-muted-foreground w-full pl-8 placeholder:text-xs sm:max-w-xl"
+              disabled={isLoading}
+            />
+            {searchValue && (
+              <Button
+                variant="ghost"
+                onClick={() => setSearchValue("")}
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                disabled={isLoading}
+              >
+                <X className="text-muted-foreground h-4 w-4" />
+              </Button>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            {dateRangeFilter && showCalender && (
+              <DataTableDateRangePicker
+                dateRange={dateRange}
+                setDateRange={(dateRange) =>
+                  setDateRange({ from: dateRange.from!, to: dateRange.to! })
+                }
+                disabled={isLoading}
+              />
+            )}
+
+            {advancedFilter && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 items-center gap-1 lg:flex"
+                onClick={() => setShowFilters(!showFilters)}
+                disabled={isLoading}
+              >
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">More Filters</span>
+              </Button>
+            )}
+
+            {showDownload && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                disabled={isLoading}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* <DataTableViewOptions table={table} disabled={isLoading} /> */}
+      </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap items-center gap-2">
+          {filterableColumns.map(
+            (column) =>
+              table.getColumn(column.id) && (
+                <DataTableFacetedFilter
+                  key={column.id}
+                  column={table.getColumn(column.id)}
+                  title={column.title}
+                  options={column.options}
+                  disabled={isLoading}
+                />
+              )
+          )}
+          {isFiltered && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                table.resetColumnFilters();
+                setGlobalFilter("");
+              }}
+              className="h-8 px-2 lg:px-3"
+              disabled={isLoading}
+            >
+              Reset
+              <X className="ml-2 h-4 w-4" />
+            </Button>
+          )}
+          {isLoading && (
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading filters...</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

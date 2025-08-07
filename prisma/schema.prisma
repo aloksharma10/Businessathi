@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  username String
+  email    String  @unique
+  password String?
+  image    String?
+
+  // company profile ( Already present in the user table )
+  companyName    String? @db.String
+  gstNo          String? @db.String
+  companyAddress String? @db.String
+  state          String? @db.String
+  stateCode      Int?    @db.Int
+  bankName       String? @db.String
+  bankBranch     String? @db.String
+  bankAccountNo  String? @db.String
+  bankIfscCode   String? @db.String
+
+  // for local company profile
+  localCompanyName    String? @db.String
+  localAddress        String? @db.String
+  localTagLine        String? @db.String
+  contactNo           String? @db.String
+  additionalContactNo String? @db.String
+
+  invoice       Invoice[]
+  product       Product[]
+  customer      Customer[]
+  localInvoice  LocalInvoice[]
+  localProduct  LocalProduct[]
+  localCustomer LocalCustomer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  productName String @db.String
+  hsnCode     Int    @db.Int
+  cgstRate    Float
+  sgstRate    Float
+
+  customPrice CustomPrice[]
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomPrice {
+  id                String @id @default(auto()) @map("_id") @db.ObjectId
+  qty               Int    @db.Int
+  rate              Float
+  taxableValue      String
+  cgstAmt           String
+  sgstAmt           String
+  productTotalValue String
+
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id])
+
+  invoiceId String?  @db.ObjectId
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, invoiceId], name: "unique_product_invoice")
+}
+
+model Customer {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  customerName String @db.String
+  address      String @db.String
+  gstIn        String @db.String
+  state        String @db.String
+  stateCode    Int    @db.Int
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  invoice Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  invoiceNo   String
+  invoiceDate DateTime @default(now())
+  monthOf     String
+  yearOf      String
+
+  totalTaxableValue     String
+  totalTaxGST           String
+  totalInvoiceValue     String
+  isOutsideDelhiInvoice Boolean
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  customerId String   @db.ObjectId
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  pricedProducts CustomPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([invoiceNo, userId], name: "unique_invoice_user")
+}
+
+model LocalCustomer {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  customerName String @db.String
+  address      String @unique @db.String
+
+  userId String? @db.ObjectId
+  user   Users?  @relation(fields: [userId], references: [id])
+
+  invoice LocalInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LocalProduct {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  productName String @unique @db.String
+
+  userId String? @db.ObjectId
+  user   Users?  @relation(fields: [userId], references: [id])
+
+  customPrice LocalCustomPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LocalCustomPrice {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  qty               Int    @db.Int
+  rate              Float
+  productTotalValue String
+
+  productId String       @db.ObjectId
+  product   LocalProduct @relation(fields: [productId], references: [id])
+
+  invoiceId String?       @db.ObjectId
+  invoice   LocalInvoice? @relation(fields: [invoiceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updated   DateTime @updatedAt
+
+  // @@unique([productId, invoiceId], name: "unique_local_product_invoice")
+}
+
+model LocalInvoice {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  localInvoiceNo   String
+  localInvoiceDate DateTime @default(now())
+  monthOf          String
+  yearOf           String
+
+  localTotalInvoiceValue String
+
+  userId String? @db.ObjectId
+  user   Users?  @relation(fields: [userId], references: [id])
+
+  customerId String        @db.ObjectId
+  customer   LocalCustomer @relation(fields: [customerId], references: [id])
+
+  pricedProducts LocalCustomPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([localInvoiceNo, userId], name: "unique_local_invoice_user")
+}
