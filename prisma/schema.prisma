@@ -128,7 +128,7 @@ model LocalCustomer {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   customerName String @db.String
-  address      String @unique @db.String
+  address      String @db.String
 
   userId String? @db.ObjectId
   user   Users?  @relation(fields: [userId], references: [id])
@@ -142,7 +142,7 @@ model LocalCustomer {
 model LocalProduct {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  productName String @unique @db.String
+  productName String @db.String
 
   userId String? @db.ObjectId
   user   Users?  @relation(fields: [userId], references: [id])
@@ -169,7 +169,6 @@ model LocalCustomPrice {
   createdAt DateTime @default(now())
   updated   DateTime @updatedAt
 
-  // @@unique([productId, invoiceId], name: "unique_local_product_invoice")
 }
 
 model LocalInvoice {
