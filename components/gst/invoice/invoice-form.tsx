@@ -43,7 +43,6 @@ import { useParams } from "next/navigation";
 import { Customer } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { Spinner } from "@/components/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import MultipleSelector from "@/components/ui/multi-selector";
@@ -272,7 +271,6 @@ export const InvoiceForm = ({
 
   return (
     <>
-      {/* {isSubmitting && <Spinner size={"lg"} />} */}
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}

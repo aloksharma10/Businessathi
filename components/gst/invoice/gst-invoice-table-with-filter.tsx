@@ -1,6 +1,6 @@
 "use client";
 
-import { FilteredInvoiceData, PricedProduct } from "@/action/filter-action";
+import { FilteredInvoiceData } from "@/action/filter-action";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +38,10 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { toast } from "sonner";
 import HoverCardToolTip from "@/components/hover-card-tooltip";
 import Link from "next/link";
-import { startOfDay, endOfDay } from "date-fns";
 import { useModal } from "@/store/store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDebounce } from "@/components/ui/multi-selector";
+import { Spinner } from "@/components/spinner";
 
 interface FilterState {
   globalSearch?: string;
@@ -61,41 +61,18 @@ export const GstInvoiceTableWithFilter = () => {
   const debouncedSearchValue = useDebounce(searchValue, 400); // Debounce with 400ms
   const { onOpen } = useModal();
   const isMobile = useIsMobile();
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     invoices,
     totalCount,
     pageCount,
-    currentPage,
     loading,
     error,
     filterInvoices,
     exportToXLSX,
     exportToCSV,
   } = useInvoiceFilter(session?.user?.id || "");
-
-  const [data, setData] = useState<FilteredInvoiceData[]>([]);
-  const [filteredInvoiceByDate, setFilteredInvoiceByDate] = useState<
-    FilteredInvoiceData[]
-  >([]);
-
-  useEffect(() => {
-    setData(invoices);
-  }, [invoices]);
-
-  useEffect(() => {
-    if (filterState.dateFrom && filterState.dateTo) {
-      const fromDate = startOfDay(filterState.dateFrom);
-      const toDate = endOfDay(filterState.dateTo);
-      const filteredData = data.filter((invoice) => {
-        const invoiceDate = startOfDay(new Date(invoice.invoiceDate));
-        return invoiceDate >= fromDate && invoiceDate <= toDate;
-      });
-      setFilteredInvoiceByDate(filteredData);
-    } else {
-      setFilteredInvoiceByDate(data);
-    }
-  }, [data, filterState.dateFrom, filterState.dateTo]);
 
   // Update filterState with debounced search value
   useEffect(() => {
@@ -152,389 +129,418 @@ export const GstInvoiceTableWithFilter = () => {
     setPage(1);
   }, []);
 
-  const handleSortingChange = useCallback((sorting: { id: string; desc: boolean }[]) => {
-    if (sorting.length > 0) {
-      const { id, desc } = sorting[0];
-      // Only allow sorting on invoiceNo
-      if (id === "invoiceNo") {
+  const handleSortingChange = useCallback(
+    (sorting: { id: string; desc: boolean }[]) => {
+      if (sorting.length > 0) {
+        const { id, desc } = sorting[0];
+        // Only allow sorting on invoiceNo
+        if (id === "invoiceNo") {
+          setFilterState((prev) => ({
+            ...prev,
+            sortBy: "invoiceNo",
+            sortOrder: desc ? "desc" : "asc",
+          }));
+        }
+      } else {
         setFilterState((prev) => ({
           ...prev,
           sortBy: "invoiceNo",
-          sortOrder: desc ? "desc" : "asc",
+          sortOrder: "desc",
         }));
       }
-    } else {
-      setFilterState((prev) => ({
-        ...prev,
-        sortBy: "invoiceNo",
-        sortOrder: "desc",
-      }));
-    }
-    setPage(1);
-  }, []);
+      setPage(1);
+    },
+    []
+  );
 
-  const handleExport = useCallback(async (formatType: "xlsx" | "csv") => {
-    try {
-      if (
-        filterState.globalSearch?.toLowerCase().includes("titan") &&
-        filterState.dateFrom &&
-        filterState.dateTo
-      ) {
-        const sortedDataCsv = [...filteredInvoiceByDate].sort(
-          (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
-        );
-        const xlsxDataForTitan = sortedDataCsv.map((row) => ({
-          "Invoice Number": row.invoiceNo,
-          "Invoice Date": format(row.invoiceDate, "dd-MM-yyyy"),
-          Month: row.monthOf,
-          "Aquafina Jar": row.pricedProducts.find(
-            (item: PricedProduct) =>
-              item.productName === "AQUAFINA WATER JAR 20 LITRE"
-          )?.qty,
-          "Tata Copper": row.pricedProducts.find(
-            (item: PricedProduct) =>
-              item.productName === "TATA COPPER WATER BOX 250ML"
-          )?.qty,
-          "Taxable Value": row.totalTaxableValue,
-          "Tax Amount": row.totalTaxGST,
-          "Invoice Value": row.totalInvoiceValue,
-        }));
-        onOpen("titanCompanySubmit", { xlsxDataForTitan });
-      } else if (
-        !filterState.globalSearch &&
-        filterState.dateFrom &&
-        filterState.dateTo
-      ) {
-        const sortedDataCsv = [...filteredInvoiceByDate].sort(
-          (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
-        );
-        const xlsxDataForGST = sortedDataCsv.flatMap((invoice) => {
-          return invoice.pricedProducts.map((product: PricedProduct) => ({
-            "Invoice No": invoice.invoiceNo,
-            "Invoice Date": format(invoice.invoiceDate, "dd-MM-yyyy"),
-            "Customer Name": invoice.customerName,
-            "Customer GST": invoice.gstIn,
-            "Product Name": product.productName,
-            "Product Qty": product.qty,
-            "Product Rate": product.rate,
-            "Product Taxable Value": Number(product.taxableValue),
-            "Tax Rate": (product.cgstRate || 0) + (product.sgstRate || 0),
-            "Tax Amount":
-              (Number(product.cgstAmt) || 0) + (Number(product.sgstAmt) || 0),
-            "Product Total": Number(product.productTotalValue),
-          }));
-        });
-        onOpen("gstSubmit", { xlsxDataForGST });
-      } else {
-        if (formatType === "xlsx") {
-          await exportToXLSX({
+  const handleExport = useCallback(
+    async (formatType: "xlsx" | "csv") => {
+      try {
+        setIsExporting(true);
+        if (
+          filterState.globalSearch?.toLowerCase().includes("titan") &&
+          filterState.dateFrom &&
+          filterState.dateTo
+        ) {
+          const xlsxResult = await exportToXLSX({
             invoiceType: "gst",
-            ...filterState,
+            exportType: "titan",
+            globalSearch: filterState.globalSearch,
+            dateFrom: filterState.dateFrom,
+            dateTo: filterState.dateTo,
+            sortBy: filterState.sortBy || "invoiceNo",
+            sortOrder: filterState.sortOrder || "desc",
           });
-          toast.success("XLSX export completed");
+          onOpen("titanCompanySubmit", {
+            xlsxDataForTitan: xlsxResult.exportData,
+          });
+        } else if (
+          !filterState.globalSearch &&
+          filterState.dateFrom &&
+          filterState.dateTo
+        ) {
+          const xlsxResult = await exportToXLSX({
+            invoiceType: "gst",
+            exportType: "gst",
+            dateFrom: filterState.dateFrom,
+            dateTo: filterState.dateTo,
+            sortBy: filterState.sortBy || "invoiceNo",
+            sortOrder: filterState.sortOrder || "desc",
+          });
+          onOpen("gstSubmit", { xlsxDataForGST: xlsxResult.exportData });
         } else {
-          await exportToCSV({
-            invoiceType: "gst",
-            ...filterState,
-          });
-          toast.success("CSV export completed");
+          // Generic export: use the fetched result and trigger download
+          if (formatType === "xlsx") {
+            const xlsxResult = await exportToXLSX({
+              invoiceType: "gst",
+              // userId is already handled by the hook
+              page: 1, // Ensure all data is fetched
+              pageSize: 100000, // A very large number to fetch all data
+              ...filterState,
+            });
+            const url = window.URL.createObjectURL(
+              new Blob([xlsxResult.buffer], { type: xlsxResult.contentType })
+            );
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = xlsxResult.filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            toast.success("XLSX export completed");
+          } else {
+            const csvResult = await exportToCSV({
+              invoiceType: "gst",
+              // userId is already handled by the hook
+              page: 1, // Ensure all data is fetched
+              pageSize: 100000, // A very large number to fetch all data
+              ...filterState,
+            });
+            const url = window.URL.createObjectURL(
+              new Blob([csvResult.content], { type: csvResult.contentType })
+            );
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = csvResult.filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            toast.success("CSV export completed");
+          }
         }
+      } catch (error) {
+        toast.error(`Failed to export`);
+        console.error(error);
+      } finally {
+        setIsExporting(false);
       }
-    } catch (error) {
-      toast.error(`Failed to export`);
-      console.error(error);
-    }
-  }, [filterState, filteredInvoiceByDate, onOpen, exportToXLSX, exportToCSV]);
+    },
+    [filterState, onOpen, exportToXLSX, exportToCSV]
+  );
 
-  const handleBulkDownloadPDF = useCallback(async (
-    selectedInvoices: FilteredInvoiceData[]
-  ) => {
-    const selectedInvoiceIds = selectedInvoices.map((row) => row.id);
-    if (selectedInvoiceIds.length === 0) {
-      toast.error("No invoices selected for bulk PDF download.");
-      return;
-    }
-    try {
-      const queryParams = new URLSearchParams();
-      selectedInvoiceIds.forEach((id) => queryParams.append("ids", id));
-      const response = await fetch(
-        `/api/invoice/gst/download-pdf?${queryParams.toString()}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to download bulk PDF");
+  const handleBulkDownloadPDF = useCallback(
+    async (selectedInvoices: FilteredInvoiceData[]) => {
+      const selectedInvoiceIds = selectedInvoices.map((row) => row.id);
+      if (selectedInvoiceIds.length === 0) {
+        toast.error("No invoices selected for bulk PDF download.");
+        return;
       }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `selected_gst_invoices.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Bulk PDF download completed");
-    } catch (error) {
-      console.error("Error downloading bulk PDF:", error);
-      toast.error("Error downloading bulk PDF");
-    }
-  }, []);
+      try {
+        const queryParams = new URLSearchParams();
+        selectedInvoiceIds.forEach((id) => queryParams.append("ids", id));
+        const response = await fetch(
+          `/api/invoice/gst/download-pdf?${queryParams.toString()}`
+        );
+        if (!response.ok) {
+          throw new Error("Failed to download bulk PDF");
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `selected_gst_invoices.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success("Bulk PDF download completed");
+      } catch (error) {
+        console.error("Error downloading bulk PDF:", error);
+        toast.error("Error downloading bulk PDF");
+      }
+    },
+    []
+  );
 
-  const handleDownloadAllFilteredPDF = useCallback(async (
-    allFilteredInvoiceData: FilteredInvoiceData[]
-  ) => {
-    const allFilteredInvoiceIds = allFilteredInvoiceData.map((row) => row.id);
-    if (allFilteredInvoiceIds.length === 0) {
-      toast.error("No invoices to download.");
-      return;
-    }
-    try {
-      const queryParams = new URLSearchParams();
-      allFilteredInvoiceIds.forEach((id) => queryParams.append("ids", id));
-      const response = await fetch(
-        `/api/invoice/gst/download-pdf?${queryParams.toString()}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to download all filtered PDF");
+  const handleDownloadAllFilteredPDF = useCallback(
+    async (allFilteredInvoiceData: FilteredInvoiceData[]) => {
+      const allFilteredInvoiceIds = allFilteredInvoiceData.map((row) => row.id);
+      if (allFilteredInvoiceIds.length === 0) {
+        toast.error("No invoices to download.");
+        return;
       }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `all_filtered_gst_invoices.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("All filtered PDF download completed");
-    } catch (error) {
-      console.error("Error downloading all filtered PDF:", error);
-      toast.error("Error downloading all filtered PDF");
-    }
-  }, []);
+      try {
+        const queryParams = new URLSearchParams();
+        allFilteredInvoiceIds.forEach((id) => queryParams.append("ids", id));
+        const response = await fetch(
+          `/api/invoice/gst/download-pdf?${queryParams.toString()}`
+        );
+        if (!response.ok) {
+          throw new Error("Failed to download all filtered PDF");
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `all_filtered_gst_invoices.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success("All filtered PDF download completed");
+      } catch (error) {
+        console.error("Error downloading all filtered PDF:", error);
+        toast.error("Error downloading all filtered PDF");
+      }
+    },
+    []
+  );
 
   // Memoize columns to prevent unnecessary re-renders
-  const columns: ColumnDef<FilteredInvoiceData>[] = useMemo(() => [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "invoiceNo",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            className="hover:bg-slate-800 hover:text-white"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Invoice No
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
+  const columns: ColumnDef<FilteredInvoiceData>[] = useMemo(
+    () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
       },
-      cell: ({ row }) => {
-        const id = row.original.id;
-        const invoiceNo = row.original.invoiceNo;
-        return (
-          <div className="flex items-center justify-center">
-            {row.getValue("invoiceNo")}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  className="cursor-pointer"
+      {
+        accessorKey: "invoiceNo",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              className="hover:bg-slate-800 hover:text-white"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+            >
+              Invoice No
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const id = row.original.id;
+          const invoiceNo = row.original.invoiceNo;
+          return (
+            <div className="flex items-center justify-center">
+              {row.getValue("invoiceNo")}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="cursor-pointer"
+                    onClick={() =>
+                      downloadButtonInColumn({
+                        invoiceId: id,
+                        invoiceNo,
+                        invoiceType: "gst",
+                      })
+                    }
+                    variant={"link"}
+                    size={"icon"}
+                  >
+                    <Download className="ml-2 h-4 w-4 text-green-600" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download PDF</TooltipContent>
+              </Tooltip>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "invoiceDate",
+        header: () => {
+          return <div className="text-center">Invoice Date</div>;
+        },
+        cell: ({ row }) => (
+          <div className="text-center">
+            {format(row.getValue("invoiceDate"), "dd-MM-yyyy")}
+          </div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "monthOf",
+        header: () => {
+          return <div className="text-center">Month</div>;
+        },
+        cell: ({ row }) => (
+          <div className="capitalize text-center">
+            {row.getValue("monthOf")}
+          </div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "customerName",
+        header: "Customer Name",
+        cell: ({ row }) => (
+          <div className="capitalize">{row.getValue("customerName")}</div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "address",
+        header: "Address",
+        cell: ({ row }) => (
+          <div className="capitalize">{row.getValue("address")}</div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "product",
+        header: "Product",
+        cell: ({ row }) => {
+          const pricedProducts = row.original.pricedProducts;
+
+          return (
+            <HoverCardToolTip
+              side="top"
+              label="Product"
+              align="center"
+              className="min-w-max"
+            >
+              <div className="flex flex-col gap-2 p-2 w-full">
+                {pricedProducts.length > 0 ? (
+                  pricedProducts.map((product, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center w-full"
+                    >
+                      <span className="capitalize text-sm">
+                        {product.productName}:
+                      </span>
+                      <span className="text-sm text-primary font-semibold">
+                        Qty: {product.qty}, Rate: {product.rate}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="capitalize">N/A</div>
+                )}
+              </div>
+            </HoverCardToolTip>
+          );
+        },
+      },
+      {
+        accessorKey: "totalTaxableValue",
+        header: () => {
+          return <div className="text-center">Total Taxable Value</div>;
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{row.getValue("totalTaxableValue")}</div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "totalTaxGST",
+        header: () => {
+          return <div className="text-center">Total Tax</div>;
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{row.getValue("totalTaxGST")}</div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "totalInvoiceValue",
+        header: () => {
+          return <div className="text-center">Total Invoice Value</div>;
+        },
+        cell: ({ row }) => {
+          const amount = parseFloat(row.getValue("totalInvoiceValue"));
+
+          const formatted = new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "INR",
+          }).format(amount);
+
+          return <div className="text-center font-medium">{formatted}</div>;
+        },
+        enableSorting: false,
+      },
+      {
+        id: "actions",
+        enableHiding: false,
+        cell: ({ row }) => {
+          const { id } = row.original;
+          const invoiceNo = row.original.invoiceNo;
+
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <Link href={`/gst/invoices/${id}/edit`}>
+                  <DropdownMenuItem>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Invoice
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuItem
                   onClick={() =>
-                    downloadButtonInColumn({
+                    downloadInvoicePDF({
                       invoiceId: id,
                       invoiceNo,
                       invoiceType: "gst",
                     })
                   }
-                  variant={"link"}
-                  size={"icon"}
                 >
-                  <Download className="ml-2 h-4 w-4 text-green-600" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download PDF</TooltipContent>
-            </Tooltip>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "invoiceDate",
-      header: () => {
-        return <div className="text-center">Invoice Date</div>;
-      },
-      cell: ({ row }) => (
-        <div className="text-center">
-          {format(row.getValue("invoiceDate"), "dd-MM-yyyy")}
-        </div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "monthOf",
-      header: () => {
-        return <div className="text-center">Month</div>;
-      },
-      cell: ({ row }) => (
-        <div className="capitalize text-center">{row.getValue("monthOf")}</div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "customerName",
-      header: "Customer Name",
-      cell: ({ row }) => (
-        <div className="capitalize">{row.getValue("customerName")}</div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "address",
-      header: "Address",
-      cell: ({ row }) => (
-        <div className="capitalize">{row.getValue("address")}</div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "product",
-      header: "Product",
-      cell: ({ row }) => {
-        const pricedProducts = row.original.pricedProducts;
-
-        return (
-          <HoverCardToolTip
-            side="top"
-            label="Product"
-            align="center"
-            className="min-w-max"
-          >
-            <div className="flex flex-col gap-2 p-2 w-full">
-              {pricedProducts.length > 0 ? (
-                pricedProducts.map((product, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center w-full"
-                  >
-                    <span className="capitalize font-semibold">
-                      {product.productName}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      Qty: {product.qty}, Rate: {product.rate}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="capitalize">N/A</div>
-              )}
-            </div>
-          </HoverCardToolTip>
-        );
-      },
-    },
-    {
-      accessorKey: "totalTaxableValue",
-      header: () => {
-        return <div className="text-center">Total Taxable Value</div>;
-      },
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("totalTaxableValue")}</div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "totalTaxGST",
-      header: () => {
-        return <div className="text-center">Total Tax</div>;
-      },
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("totalTaxGST")}</div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "totalInvoiceValue",
-      header: () => {
-        return <div className="text-center">Total Invoice Value</div>;
-      },
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("totalInvoiceValue"));
-
-        const formatted = new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "INR",
-        }).format(amount);
-
-        return <div className="text-center font-medium">{formatted}</div>;
-      },
-      enableSorting: false,
-    },
-    {
-      id: "actions",
-      enableHiding: false,
-      cell: ({ row }) => {
-        const { id } = row.original;
-        const invoiceNo = row.original.invoiceNo;
-
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <Link href={`/gst/invoices/${id}/edit`}>
-                <DropdownMenuItem>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit Invoice
+                  <ArrowDownToLine className="h-4 w-4 mr-2" />
+                  Download PDF
                 </DropdownMenuItem>
-              </Link>
-              <DropdownMenuItem
-                onClick={() =>
-                  downloadInvoicePDF({
-                    invoiceId: id,
-                    invoiceNo,
-                    invoiceType: "gst",
-                  })
-                }
-              >
-                <ArrowDownToLine className="h-4 w-4 mr-2" />
-                Download PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
       },
-    },
-  ], []);
+    ],
+    []
+  );
 
-  const isFilterActive = useMemo(() => 
-    !!filterState.globalSearch ||
-    !!filterState.dateFrom ||
-    !!filterState.dateTo,
+  const isFilterActive = useMemo(
+    () =>
+      !!filterState.globalSearch ||
+      !!filterState.dateFrom ||
+      !!filterState.dateTo,
     [filterState.globalSearch, filterState.dateFrom, filterState.dateTo]
   );
 
@@ -599,8 +605,14 @@ export const GstInvoiceTableWithFilter = () => {
               <div className="flex md:flex-1 justify-end items-end gap-2">
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="ml-auto px-6">
+                    <Button variant="outline" className="ml-auto px-5">
                       <Download className="mr-3 h-4 w-4" /> Export
+                      {isExporting &&
+                        (isMobile ? (
+                          <Spinner size="lg" />
+                        ) : (
+                          <LoaderCircle className="ml-2 w-4 h-4 animate-spin text-primary" />
+                        ))}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

@@ -20,7 +20,7 @@ const HoverCardToolTip = ({
     return (
         <HoverCard openDelay={50}>
             <HoverCardTrigger
-                className={cn("text-blue-900 dark:text-white cursor-pointer max-w-min text-nowrap capitalize",
+                className={cn("text-primary dark:text-white cursor-pointer max-w-min text-nowrap capitalize",
                     !Icon && "border-dashed border-b border-blue-600 underline-offset-1"
                 )}
             >

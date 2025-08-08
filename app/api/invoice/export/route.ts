@@ -24,20 +24,23 @@ export async function POST(request: NextRequest) {
     if (format === "xlsx") {
       result = await exportInvoicesToXLSX(params);
       
-      return new NextResponse(result.buffer, {
-        headers: {
-          "Content-Type": result.contentType,
-          "Content-Disposition": `attachment; filename="${result.filename}"`,
-        },
+      // Convert ArrayBuffer to base64 string for JSON transport
+      const base64Buffer = Buffer.from(result.buffer).toString('base64');
+      
+      return NextResponse.json({
+        buffer: base64Buffer,
+        filename: result.filename,
+        contentType: result.contentType,
+        exportData: result.exportData, // Include the transformed data
       });
     } else if (format === "csv") {
       result = await exportInvoicesToCSV(params);
       
-      return new NextResponse(result.content, {
-        headers: {
-          "Content-Type": result.contentType,
-          "Content-Disposition": `attachment; filename="${result.filename}"`,
-        },
+      return NextResponse.json({
+        content: result.content,
+        filename: result.filename,
+        contentType: result.contentType,
+        exportData: result.exportData, // Include the transformed data
       });
     } else {
       return NextResponse.json({ error: "Invalid format. Use 'xlsx' or 'csv'" }, { status: 400 });

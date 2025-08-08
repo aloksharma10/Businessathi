@@ -20,7 +20,6 @@ import { Product } from "@prisma/client";
 import { useEffect } from "react";
 import { useModal } from "@/store/store";
 import { toast } from "sonner";
-import { Spinner } from "@/components/spinner";
 
 const FormSchemaProduct = z.object({
   productName: z.string().min(2, {
@@ -94,7 +93,6 @@ export function ProductForm({
 
   return (
     <>
-      {/* {isSubmitting && <Spinner size={"lg"} />} */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField

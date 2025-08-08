@@ -18,6 +18,7 @@ export interface InvoiceFilterParams {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  exportType?: "titan" | "gst" | undefined;
 }
 
 export interface PricedProduct {
@@ -52,6 +53,45 @@ export interface FilteredInvoiceData {
   createdAt: Date;
   updatedAt: Date;
   pricedProducts: PricedProduct[];
+}
+
+interface TitanExportData {
+  "Invoice Number": string;
+  "Invoice Date": string;
+  Month: string;
+  "Aquafina Jar"?: number;
+  "Tata Copper"?: number;
+  "Taxable Value"?: string;
+  "Tax Amount"?: string;
+  "Invoice Value": string;
+}
+
+interface GSTExportData {
+  "Invoice No": string;
+  "Invoice Date": string;
+  "Customer Name": string;
+  "Customer GST"?: string;
+  "Product Name": string;
+  "Product Qty": number;
+  "Product Rate": number;
+  "Product Taxable Value": number;
+  "Tax Rate": number;
+  "Tax Amount": number;
+  "Product Total": number;
+}
+
+interface GenericExportData {
+  "Invoice No": string;
+  "Invoice Date": string;
+  Month: string;
+  "Customer Name": string;
+  Address: string;
+  "Total Invoice Value": string;
+  "GST Number"?: string;
+  State?: string;
+  "State Code"?: number;
+  "Total Taxable Value"?: string;
+  "Total GST"?: string;
 }
 
 // Types for customer filter parameters
@@ -419,21 +459,71 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
     }
 
     // Transform data for export
-    const exportData = invoices.map((invoice) => ({
-      "Invoice No": invoice.invoiceNo,
-      "Invoice Date": format(invoice.invoiceDate, "dd-MM-yyyy"),
-      Month: invoice.monthOf,
-      "Customer Name": invoice.customerName,
-      Address: invoice.address,
-      "Total Invoice Value": invoice.totalInvoiceValue,
-      ...(params.invoiceType === "gst" && {
-        "GST Number": invoice.gstIn || "",
-        State: invoice.state || "",
-        "State Code": invoice.stateCode || "",
-        "Total Taxable Value": invoice.totalTaxableValue || "",
-        "Total GST": invoice.totalTaxGST || "",
-      }),
-    }));
+    let exportData: (TitanExportData | GSTExportData | GenericExportData)[] = [];
+    let sheetName = "Invoices";
+
+    if (params.exportType === "titan") {
+      const sortedData = [...invoices].sort(
+        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+      );
+      exportData = sortedData.map((row) => ({
+        "Invoice Number": row.invoiceNo,
+        "Invoice Date": format(row.invoiceDate, "dd-MM-yyyy"),
+        Month: row.monthOf,
+        "Aquafina Jar": row.pricedProducts.find(
+          (item: PricedProduct) =>
+            item.productName === "AQUAFINA WATER JAR 20 LITRE"
+        )?.qty,
+        "Tata Copper": row.pricedProducts.find(
+          (item: PricedProduct) =>
+            item.productName === "TATA COPPER WATER BOX 250ML"
+        )?.qty,
+        "Taxable Value": row.totalTaxableValue,
+        "Tax Amount": row.totalTaxGST,
+        "Invoice Value": row.totalInvoiceValue,
+      }));
+      sheetName = "Titan Invoices";
+    } else if (params.exportType === "gst") {
+      const sortedData = [...invoices].sort(
+        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+      );
+      exportData = sortedData.flatMap((invoice) => {
+        return invoice.pricedProducts.map((product: PricedProduct) => ({
+          "Invoice No": invoice.invoiceNo,
+          "Invoice Date": format(invoice.invoiceDate, "dd-MM-yyyy"),
+          "Customer Name": invoice.customerName,
+          "Customer GST": invoice.gstIn,
+          "Product Name": product.productName,
+          "Product Qty": product.qty,
+          "Product Rate": product.rate,
+          "Product Taxable Value": Number(product.taxableValue),
+          "Tax Rate": (product.cgstRate || 0) + (product.sgstRate || 0),
+          "Tax Amount":
+            (Number(product.cgstAmt) || 0) + (Number(product.sgstAmt) || 0),
+          "Product Total": Number(product.productTotalValue),
+        }));
+      });
+      sheetName = "GST Invoices";
+    } else {
+      exportData = invoices.map((invoice) => ({
+        "Invoice No": invoice.invoiceNo,
+        "Invoice Date": format(invoice.invoiceDate, "dd-MM-yyyy"),
+        Month: invoice.monthOf,
+        "Customer Name": invoice.customerName,
+        Address: invoice.address,
+        "Total Invoice Value": invoice.totalInvoiceValue,
+        ...(params.invoiceType === "gst" && params.exportType === undefined
+        ? [
+            { wch: 20 }, // GST Number
+            { wch: 15 }, // State
+            { wch: 12 }, // State Code
+            { wch: 20 }, // Total Taxable Value
+            { wch: 15 }, // Total GST
+            { wch: 12 }, // Outside Delhi
+          ]
+        : []),
+      }));
+    }
 
     // Create workbook and worksheet
     const workbook = XLSX.utils.book_new();
@@ -448,7 +538,7 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
       { wch: 25 }, // Customer Name
       { wch: 40 }, // Address
       { wch: 20 }, // Total Invoice Value
-      ...(params.invoiceType === "gst"
+      ...(params.invoiceType === "gst" && params.exportType === undefined
         ? [
             { wch: 20 }, // GST Number
             { wch: 15 }, // State
@@ -462,7 +552,6 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
     worksheet["!cols"] = columnWidths;
 
     // Add worksheet to workbook
-    const sheetName = `${params.invoiceType.toUpperCase()} Invoices`;
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
     // Generate buffer
@@ -470,13 +559,19 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
 
     // Generate filename with timestamp
     const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
-    const filename = `${params.invoiceType}_invoices_${timestamp}.xlsx`;
+    let filename = `${params.invoiceType}_invoices_${timestamp}.xlsx`;
+    if (params.exportType === "titan") {
+      filename = `titan_invoices_${timestamp}.xlsx`;
+    } else if (params.exportType === "gst") {
+      filename = `gst_invoices_${timestamp}.xlsx`;
+    }
 
     return {
       buffer,
       filename,
       contentType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      exportData: exportData, // Return the transformed data as well
     };
   } catch (error) {
     console.error("Error exporting invoices to XLSX:", error);
@@ -499,61 +594,129 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
     }
 
     // Define headers
-    const headers = [
-      "Invoice No",
-      "Invoice Date",
-      "Month",
-      "Year",
-      "Customer Name",
-      "Address",
-      "Total Invoice Value",
-      ...(params.invoiceType === "gst"
-        ? [
-            "GST Number",
-            "State",
-            "State Code",
-            "Total Taxable Value",
-            "Total GST",
-            "Outside Delhi",
-          ]
-        : []),
-    ];
+    let headers: string[] = [];
+    let csvData: (string | number)[][] = [];
+    let filename = `${params.invoiceType}_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
 
-    // Transform data for CSV
-    const csvData = invoices.map((invoice) => [
-      invoice.invoiceNo,
-      format(invoice.invoiceDate, "dd/MM/yyyy"),
-      invoice.monthOf,
-      invoice.yearOf,
-      invoice.customerName,
-      invoice.address,
-      invoice.totalInvoiceValue,
-      ...(params.invoiceType === "gst"
-        ? [
-            invoice.gstIn || "",
-            invoice.state || "",
-            invoice.stateCode || "",
-            invoice.totalTaxableValue || "",
-            invoice.totalTaxGST || "",
-            invoice.isOutsideDelhiInvoice ? "Yes" : "No",
-          ]
-        : []),
-    ]);
+    if (params.exportType === "titan") {
+      const sortedData = [...invoices].sort(
+        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+      );
+      headers = [
+        "Invoice Number",
+        "Invoice Date",
+        "Month",
+        "Aquafina Jar",
+        "Tata Copper",
+        "Taxable Value",
+        "Tax Amount",
+        "Invoice Value",
+      ];
+      csvData = sortedData.map((row) => [
+        row.invoiceNo,
+        format(row.invoiceDate, "dd-MM-yyyy"),
+        row.monthOf,
+        row.pricedProducts.find(
+          (item: PricedProduct) =>
+            item.productName === "AQUAFINA WATER JAR 20 LITRE"
+        )?.qty || "",
+        row.pricedProducts.find(
+          (item: PricedProduct) =>
+            item.productName === "TATA COPPER WATER BOX 250ML"
+        )?.qty || "",
+        row.totalTaxableValue ?? "",
+        row.totalTaxGST ?? "",
+        row.totalInvoiceValue ?? "",
+      ]);
+      filename = `titan_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
+    } else if (params.exportType === "gst") {
+      const sortedData = [...invoices].sort(
+        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+      );
+      headers = [
+        "Invoice No",
+        "Invoice Date",
+        "Customer Name",
+        "Customer GST",
+        "Product Name",
+        "Product Qty",
+        "Product Rate",
+        "Product Taxable Value",
+        "Tax Rate",
+        "Tax Amount",
+        "Product Total",
+      ];
+      csvData = sortedData.flatMap((invoice) => {
+        return invoice.pricedProducts.map((product: PricedProduct) => [
+          invoice.invoiceNo,
+          format(invoice.invoiceDate, "dd-MM-yyyy"),
+          invoice.customerName,
+          invoice.gstIn ?? "",
+          product.productName ?? "",
+          product.qty ?? 0,
+          product.rate ?? 0,
+          Number(product.taxableValue ?? "0"),
+          (product.cgstRate ?? 0) + (product.sgstRate ?? 0),
+          (Number(product.cgstAmt ?? "0")) + (Number(product.sgstAmt ?? "0")),
+          Number(product.productTotalValue ?? "0"),
+        ]);
+      });
+      filename = `gst_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
+    } else {
+      headers = [
+        "Invoice No",
+        "Invoice Date",
+        "Month",
+        "Year",
+        "Customer Name",
+        "Address",
+        "Total Invoice Value",
+        ...(params.invoiceType === "gst"
+          ? [
+              "GST Number",
+              "State",
+              "State Code",
+              "Total Taxable Value",
+              "Total GST",
+              "Outside Delhi",
+            ]
+          : []),
+      ];
+
+      csvData = invoices.map((invoice) => [
+        invoice.invoiceNo,
+        format(invoice.invoiceDate, "dd/MM/yyyy"),
+        invoice.monthOf,
+        invoice.yearOf,
+        invoice.customerName,
+        invoice.address,
+        invoice.totalInvoiceValue,
+        ...(params.invoiceType === "gst"
+          ? [
+              invoice.gstIn ?? "",
+              invoice.state ?? "",
+              invoice.stateCode ?? 0, // Changed to ?? 0
+              invoice.totalTaxableValue ?? "",
+              invoice.totalTaxGST ?? "",
+              invoice.isOutsideDelhiInvoice ? "Yes" : "No",
+            ]
+          : []),
+      ]);
+    }
 
     // Create CSV content
     const csvContent = [
       headers.join(","),
-      ...csvData.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ...csvData.map((row) => row.map((cell: string | number | undefined | null) => (cell === undefined || cell === null ? "" : `"${cell}"`)).join(",")),
     ].join("\n");
 
-    // Generate filename with timestamp
-    const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
-    const filename = `${params.invoiceType}_invoices_${timestamp}.csv`;
+    
 
     return {
       content: csvContent,
       filename,
       contentType: "text/csv",
+      exportData: csvData, // Return the transformed data as well
     };
   } catch (error) {
     console.error("Error exporting invoices to CSV:", error);

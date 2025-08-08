@@ -2,23 +2,26 @@ import { cn } from "@/lib/utils";
 import { cva, VariantProps } from "class-variance-authority";
 import { LoaderCircle } from "lucide-react";
 
-const spinnerVariants = cva("text-muted-foreground animate-spin", {
-  variants: {
-    size: {
-      default: "h-4 w-4",
-      lg: "h-10 w-10",
+const spinnerVariants = cva(
+  "text-primary animate-spin",
+  {
+    variants: {
+      size: {
+        default: "h-8 w-8",
+        lg: "h-12 w-12",
+      },
     },
-  },
-  defaultVariants: {
-    size: "default",
-  },
-});
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
 
 interface SpinnerProps extends VariantProps<typeof spinnerVariants> {}
 
 export const Spinner = ({ size }: SpinnerProps) => {
   return (
-    <div className="fixed h-screen w-screen inset-0 flex justify-center items-center dark:bg-gray-900/50 bg-gray-300/50 bg-opacity-25 cursor-not-allowed">
+    <div className="fixed inset-0 flex justify-center items-center bg-accent/5 backdrop-blur-[1px] z-50 cursor-not-allowed">
       <LoaderCircle className={cn(spinnerVariants({ size }))} />
     </div>
   );

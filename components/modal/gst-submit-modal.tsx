@@ -22,7 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { exportToExcel } from "@/lib/utils";
-
+import { toast } from "sonner";
 
 export const GSTSubmitModal = () => {
   const { data, type, onClose, isOpen } = useModal();
@@ -48,10 +48,13 @@ export const GSTSubmitModal = () => {
 
   const watchedName = form.watch("CustomxlsxName");
 
-  async function onSubmit(values: z.infer<typeof FormSchemaCustomxlsxName>) {
+  async function onSubmit() {
     try {
       form.reset();
-    } catch (error) { }
+      toast.success("GST Excel file generated successfully");
+    } catch (error) {
+      console.error(error, "[GSTSubmitModal]");
+    }
   }
 
   const xlsxData = data?.xlsxDataForGST || [];
@@ -75,16 +78,17 @@ export const GSTSubmitModal = () => {
                   <FormItem className="w-full">
                     <FormLabel>Excel File Name</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="filename"
-                        {...field}
-                      />
+                      <Input placeholder="filename" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button onClick={() => exportToExcel(xlsxData, watchedName, onClose)}>Download Excel</Button>
+              <Button
+                onClick={() => exportToExcel(xlsxData, watchedName, onClose)}
+              >
+                Download Excel
+              </Button>
             </div>
           </form>
         </Form>

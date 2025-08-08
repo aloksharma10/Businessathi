@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/command";
 import { useEffect, useState } from "react";
 import { LocalCustomer, LocalInvoice } from "@prisma/client";
-import { Spinner } from "@/components/spinner";
 import {
   Popover,
   PopoverContent,
@@ -345,13 +344,12 @@ export function LocalInvoiceForm({
 
   return (
     <div>
-      {/* {isSubmitting && <Spinner size={"lg"} />} */}
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="lg:space-y-4 px-2 space-y-8"
         >
-          <div className="lg:flex items-center justify-center gap-5 w-full lg:space-y-0 space-y-8">
+          <div className="lg:flex justify-center gap-5 w-full lg:space-y-0 space-y-8">
             <FormField
               control={form.control}
               name="localInvoiceNo"

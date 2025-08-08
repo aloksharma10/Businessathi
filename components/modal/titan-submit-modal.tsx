@@ -22,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { exportToExcel } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const TitanSubmitModal = () => {
   const { data, type, onClose, isOpen } = useModal();
@@ -50,6 +51,7 @@ export const TitanSubmitModal = () => {
   async function onSubmit() {
     try {
       form.reset();
+      toast.success("Titan Company Limited Excel file generated successfully");
     } catch (error) {
       console.error(error, "[TitanSubmitModal]");
     }

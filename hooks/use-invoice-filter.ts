@@ -13,8 +13,8 @@ interface UseInvoiceFilterReturn {
   filterInvoices: (params: Omit<InvoiceFilterParams, "userId">) => Promise<void>;
   getMonths: (invoiceType: "gst" | "local") => Promise<string[]>;
   getCustomers: (invoiceType: "gst" | "local") => Promise<{ id: string; customerName: string; address: string; }[]>;
-  exportToXLSX: (params: Omit<InvoiceFilterParams, "userId">) => Promise<void>;
-  exportToCSV: (params: Omit<InvoiceFilterParams, "userId">) => Promise<void>;
+  exportToXLSX: (params: Omit<InvoiceFilterParams, "userId">) => Promise<{ buffer: ArrayBuffer; filename: string; contentType: string, exportData: any[] }>;
+  exportToCSV: (params: Omit<InvoiceFilterParams, "userId">) => Promise<{ content: string; filename: string; contentType: string, exportData: any[] }>;
 }
 
 export const useInvoiceFilter = (userId: string): UseInvoiceFilterReturn => {
@@ -81,15 +81,10 @@ export const useInvoiceFilter = (userId: string): UseInvoiceFilterReturn => {
         throw new Error("Failed to export invoices");
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `invoices_${new Date().toISOString().split("T")[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const data = await response.json(); // Assuming the response is JSON with buffer, filename, contentType
+      // Convert base64 string to ArrayBuffer
+      const buffer = Uint8Array.from(atob(data.buffer), c => c.charCodeAt(0)).buffer;
+      return { buffer, filename: data.filename, contentType: data.contentType, exportData: data.exportData };
     } catch (err) {
       console.error("Error exporting to XLSX:", err);
       throw err;
@@ -113,15 +108,8 @@ export const useInvoiceFilter = (userId: string): UseInvoiceFilterReturn => {
         throw new Error("Failed to export invoices");
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `invoices_${new Date().toISOString().split("T")[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const data = await response.json(); // Assuming the response is JSON with content, filename, contentType
+      return { content: data.content, filename: data.filename, contentType: data.contentType, exportData: data.exportData };
     } catch (err) {
       console.error("Error exporting to CSV:", err);
       throw err;
