@@ -9,8 +9,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ProductForm } from "@/components/gst/product/product-form";
+import { useSession } from "next-auth/react";
 
 export const EditProductModal = () => {
+  const session = useSession();
+
   const { data, type, onClose, isOpen } = useModal();
 
   const isOpenModel = isOpen && type === "editProduct";
@@ -23,8 +26,10 @@ export const EditProductModal = () => {
     <Dialog open={isOpenModel} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>MUKESH TRADERS</DialogTitle>
-          <DialogDescription>Edit Product</DialogDescription>
+          <DialogTitle>{session.data?.user.companyName}</DialogTitle>
+          <DialogDescription>
+            Update the product&apos;s information as needed.
+          </DialogDescription>
         </DialogHeader>
         <ProductForm productData={data.product} />
       </DialogContent>

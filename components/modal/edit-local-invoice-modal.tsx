@@ -53,18 +53,16 @@ export const EditLocalInvoiceModal = () => {
     <Sheet open={isOpenModel} onOpenChange={handleClose}>
       <SheetContent className="md:min-w-[700px]">
         <SheetHeader>
-          <SheetTitle>MUKESH TRADERS</SheetTitle>
-          <SheetDescription>Edit Local Invoice</SheetDescription>
+          <SheetTitle>{session.data?.user.companyName}</SheetTitle>
+          <SheetDescription>
+            Update the invoice&apos;s information as needed.
+          </SheetDescription>
           <LocalInvoiceForm
             mode={"edit"}
             userId={userId}
             localInvoiceData={data.localInvoice}
             customers={customers as LocalCustomer[]}
-            // customerId={data?.localInvoice?.customerId as string}
             products={products as any[]}
-            // productDetails={
-            //   data.localInvoice.
-            // }
           />
         </SheetHeader>
       </SheetContent>

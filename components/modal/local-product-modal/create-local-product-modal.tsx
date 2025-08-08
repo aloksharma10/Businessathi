@@ -9,9 +9,11 @@ import {
 } from "@/components/ui/dialog";
 import { useModal } from "@/store/store";
 import { LocalProductForm } from "../../local/product/local-product-form";
+import { useSession } from "next-auth/react";
 
 export const CreateLocalProductModal = () => {
-  const { data, type, onClose, isOpen } = useModal();
+  const session = useSession();
+  const { type, onClose, isOpen } = useModal();
 
   const isOpenModel = isOpen && type === "createLocalProduct";
 
@@ -23,8 +25,10 @@ export const CreateLocalProductModal = () => {
       <Dialog open={isOpenModel} onOpenChange={handleClose}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>MUKESH TRADERS</DialogTitle>
-            <DialogDescription>Create Local Product</DialogDescription>
+            <DialogTitle>{session.data?.user.companyName}</DialogTitle>
+            <DialogDescription>
+              Enter details to create a new product.
+            </DialogDescription>
           </DialogHeader>
           <LocalProductForm />
         </DialogContent>

@@ -9,8 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LocalCustomerForm } from "@/components/local/customer/local-customer-form";
+import { useSession } from "next-auth/react";
 
 export const EditLocalCustomerModal = () => {
+  const session = useSession();
   const { data, type, onClose, isOpen } = useModal();
 
   const isOpenModel = isOpen && type === "editLocalCustomer";
@@ -23,8 +25,10 @@ export const EditLocalCustomerModal = () => {
     <Dialog open={isOpenModel} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>MUKESH TRADERS</DialogTitle>
-          <DialogDescription>Edit Local Customer</DialogDescription>
+          <DialogTitle>{session.data?.user.companyName}</DialogTitle>
+          <DialogDescription>
+            Update the customer&apos;s information as needed.
+          </DialogDescription>
         </DialogHeader>
         <LocalCustomerForm localCustomerData={data.localCustomer} />
       </DialogContent>

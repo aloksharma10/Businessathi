@@ -11,7 +11,7 @@ import {
 import { CompanyProfileForm } from "../company-profile-form";
 
 export const CompanyProfileModal = () => {
-  const { data, type, onClose, isOpen } = useModal();
+  const { type, onClose, isOpen } = useModal();
 
   const isOpenModel = isOpen && type === "companyProfile";
 
