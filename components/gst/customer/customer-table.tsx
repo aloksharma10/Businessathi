@@ -120,6 +120,7 @@ export const CustomerTable = () => {
       }
     } catch (error) {
       toast.error(`Failed to export ${format.toUpperCase()}`);
+      console.error(error, "[handleExport]");
     }
   };
 
@@ -308,7 +309,7 @@ export const CustomerTable = () => {
           },
         ]}
         defaultVisibility={{
-          address: false, // Hide address column by default
+          address: true, // Hide address column by default
         }}
         onPaginationChange={({ pageIndex, pageSize: newPageSize }) => {
           setPage(pageIndex + 1);

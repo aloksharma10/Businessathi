@@ -3,7 +3,17 @@
 import prisma from "@/lib/db";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
-import { Prisma, Product, LocalProduct, Invoice, Customer, LocalInvoice, LocalCustomer, LocalCustomPrice, CustomPrice } from "@prisma/client";
+import {
+  Prisma,
+  Product,
+  LocalProduct,
+  Invoice,
+  Customer,
+  LocalInvoice,
+  LocalCustomer,
+  LocalCustomPrice,
+  CustomPrice,
+} from "@prisma/client";
 
 // Types for filter parameters
 export interface InvoiceFilterParams {
@@ -176,7 +186,9 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
     const skip = (page - 1) * pageSize;
 
     // Build where conditions
-    const whereConditions: Prisma.InvoiceWhereInput | Prisma.LocalInvoiceWhereInput = {
+    const whereConditions:
+      | Prisma.InvoiceWhereInput
+      | Prisma.LocalInvoiceWhereInput = {
       userId,
     };
 
@@ -207,7 +219,10 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
 
     // Add global search filter
     if (globalSearch) {
-      const searchConditions: (Prisma.InvoiceWhereInput | Prisma.LocalInvoiceWhereInput)[] = [
+      const searchConditions: (
+        | Prisma.InvoiceWhereInput
+        | Prisma.LocalInvoiceWhereInput
+      )[] = [
         {
           customer: {
             customerName: {
@@ -243,18 +258,29 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
       }
 
       if (invoiceType === "gst") {
-        (whereConditions as Prisma.InvoiceWhereInput).OR = searchConditions as Prisma.InvoiceWhereInput[];
+        (whereConditions as Prisma.InvoiceWhereInput).OR =
+          searchConditions as Prisma.InvoiceWhereInput[];
       } else {
-        (whereConditions as Prisma.LocalInvoiceWhereInput).OR = searchConditions as Prisma.LocalInvoiceWhereInput[];
+        (whereConditions as Prisma.LocalInvoiceWhereInput).OR =
+          searchConditions as Prisma.LocalInvoiceWhereInput[];
       }
     }
 
     // Get filtered invoices with customer data based on invoice type
-    let invoices: (Invoice & { customer: Customer; pricedProducts: (CustomPrice & { product: Product; })[]; } | LocalInvoice & { customer: LocalCustomer; pricedProducts: (LocalCustomPrice & { product: LocalProduct; })[]; })[] = [];
+    let invoices: (
+      | (Invoice & {
+          customer: Customer;
+          pricedProducts: (CustomPrice & { product: Product })[];
+        })
+      | (LocalInvoice & {
+          customer: LocalCustomer;
+          pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+        })
+    )[] = [];
     let totalCount = 0;
 
     if (invoiceType === "gst") {
-      invoices = await prisma.invoice.findMany({
+      invoices = (await prisma.invoice.findMany({
         where: whereConditions as Prisma.InvoiceWhereInput,
         include: {
           customer: true,
@@ -264,20 +290,24 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
             },
           },
         },
-        orderBy: sortBy === "customer.customerName" 
-          ? { customer: { customerName: sortOrder } }
-          : sortBy === "customer.address"
-          ? { customer: { address: sortOrder } }
-          : { [sortBy]: sortOrder },
+        orderBy:
+          sortBy === "customer.customerName"
+            ? { customer: { customerName: sortOrder } }
+            : sortBy === "customer.address"
+            ? { customer: { address: sortOrder } }
+            : { [sortBy]: sortOrder },
         skip,
         take: pageSize,
-      }) as (Invoice & { customer: Customer; pricedProducts: (CustomPrice & { product: Product; })[]; })[];
+      })) as (Invoice & {
+        customer: Customer;
+        pricedProducts: (CustomPrice & { product: Product })[];
+      })[];
 
       totalCount = await prisma.invoice.count({
         where: whereConditions as Prisma.InvoiceWhereInput,
       });
     } else {
-      invoices = await prisma.localInvoice.findMany({
+      invoices = (await prisma.localInvoice.findMany({
         where: whereConditions as Prisma.LocalInvoiceWhereInput,
         include: {
           customer: true,
@@ -287,14 +317,18 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
             },
           },
         },
-        orderBy: sortBy === "customer.customerName" 
-          ? { customer: { customerName: sortOrder } }
-          : sortBy === "customer.address"
-          ? { customer: { address: sortOrder } }
-          : { [sortBy]: sortOrder },
+        orderBy:
+          sortBy === "customer.customerName"
+            ? { customer: { customerName: sortOrder } }
+            : sortBy === "customer.address"
+            ? { customer: { address: sortOrder } }
+            : { [sortBy]: sortOrder },
         skip,
         take: pageSize,
-      }) as (LocalInvoice & { customer: LocalCustomer; pricedProducts: (LocalCustomPrice & { product: LocalProduct; })[]; })[];
+      })) as (LocalInvoice & {
+        customer: LocalCustomer;
+        pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+      })[];
 
       totalCount = await prisma.localInvoice.count({
         where: whereConditions as Prisma.LocalInvoiceWhereInput,
@@ -305,7 +339,10 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
     const transformedInvoices: FilteredInvoiceData[] = invoices.map(
       (invoice) => {
         if (invoiceType === "gst") {
-          const gstInvoice = invoice as Invoice & { customer: Customer; pricedProducts: (CustomPrice & { product: Product; })[]; };
+          const gstInvoice = invoice as Invoice & {
+            customer: Customer;
+            pricedProducts: (CustomPrice & { product: Product })[];
+          };
           return {
             id: gstInvoice.id,
             invoiceNo: gstInvoice.invoiceNo,
@@ -324,7 +361,7 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
             customerId: gstInvoice.customerId,
             createdAt: gstInvoice.createdAt,
             updatedAt: gstInvoice.updatedAt,
-            pricedProducts: gstInvoice.pricedProducts.map(pp => ({
+            pricedProducts: gstInvoice.pricedProducts.map((pp) => ({
               productId: pp.productId,
               productName: pp.product.productName,
               qty: pp.qty,
@@ -338,7 +375,10 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
             })),
           } as FilteredInvoiceData;
         } else {
-          const localInvoice = invoice as LocalInvoice & { customer: LocalCustomer; pricedProducts: (LocalCustomPrice & { product: LocalProduct; })[]; };
+          const localInvoice = invoice as LocalInvoice & {
+            customer: LocalCustomer;
+            pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+          };
           return {
             id: localInvoice.id,
             invoiceNo: localInvoice.localInvoiceNo,
@@ -349,7 +389,7 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
             address: localInvoice.customer.address,
             totalInvoiceValue: localInvoice.localTotalInvoiceValue,
             customerId: localInvoice.customerId,
-            pricedProducts: localInvoice.pricedProducts.map(pp => ({
+            pricedProducts: localInvoice.pricedProducts.map((pp) => ({
               productId: pp.productId,
               productName: pp.product.productName,
               qty: pp.qty,
@@ -413,7 +453,10 @@ export const getUniqueCustomers = async (
   invoiceType: "gst" | "local"
 ) => {
   try {
-    let customers: ({ id: string; customerName: string; address: string; } | { id: string; customerName: string; address: string; })[] = [];
+    let customers: (
+      | { id: string; customerName: string; address: string }
+      | { id: string; customerName: string; address: string }
+    )[] = [];
 
     if (invoiceType === "gst") {
       customers = await prisma.customer.findMany({
@@ -459,29 +502,36 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
     }
 
     // Transform data for export
-    let exportData: (TitanExportData | GSTExportData | GenericExportData)[] = [];
+    let exportData: (TitanExportData | GSTExportData | GenericExportData)[] =
+      [];
     let sheetName = "Invoices";
 
     if (params.exportType === "titan") {
       const sortedData = [...invoices].sort(
         (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
       );
-      exportData = sortedData.map((row) => ({
-        "Invoice Number": row.invoiceNo,
-        "Invoice Date": format(row.invoiceDate, "dd-MM-yyyy"),
-        Month: row.monthOf,
-        "Aquafina Jar": row.pricedProducts.find(
-          (item: PricedProduct) =>
-            item.productName === "AQUAFINA WATER JAR 20 LITRE"
-        )?.qty,
-        "Tata Copper": row.pricedProducts.find(
-          (item: PricedProduct) =>
-            item.productName === "TATA COPPER WATER BOX 250ML"
-        )?.qty,
-        "Taxable Value": row.totalTaxableValue,
-        "Tax Amount": row.totalTaxGST,
-        "Invoice Value": row.totalInvoiceValue,
-      }));
+      exportData = sortedData.map((row) => {
+        const codeMatch = row.address?.match(/\(([^)]+)\)\s*$/);
+        const StoreCode = codeMatch ? codeMatch[1] : ""; // Extract code or empty string if not found
+
+        return {
+          "Invoice Number": row.invoiceNo,
+          "Invoice Date": format(row.invoiceDate, "dd-MM-yyyy"),
+          "Store Code": StoreCode, // new field with extracted code
+          Month: row.monthOf,
+          "Aquafina Jar": row.pricedProducts.find(
+            (item: PricedProduct) =>
+              item.productName === "AQUAFINA WATER JAR 20 LITRE"
+          )?.qty,
+          "Tata Copper": row.pricedProducts.find(
+            (item: PricedProduct) =>
+              item.productName === "TATA COPPER WATER BOX 250ML"
+          )?.qty,
+          "Taxable Value": row.totalTaxableValue,
+          "Tax Amount": row.totalTaxGST,
+          "Invoice Value": row.totalInvoiceValue,
+        };
+      });
       sheetName = "Titan Invoices";
     } else if (params.exportType === "gst") {
       const sortedData = [...invoices].sort(
@@ -513,15 +563,15 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
         Address: invoice.address,
         "Total Invoice Value": invoice.totalInvoiceValue,
         ...(params.invoiceType === "gst" && params.exportType === undefined
-        ? [
-            { wch: 20 }, // GST Number
-            { wch: 15 }, // State
-            { wch: 12 }, // State Code
-            { wch: 20 }, // Total Taxable Value
-            { wch: 15 }, // Total GST
-            { wch: 12 }, // Outside Delhi
-          ]
-        : []),
+          ? [
+              { wch: 20 }, // GST Number
+              { wch: 15 }, // State
+              { wch: 12 }, // State Code
+              { wch: 20 }, // Total Taxable Value
+              { wch: 15 }, // Total GST
+              { wch: 12 }, // Outside Delhi
+            ]
+          : []),
       }));
     }
 
@@ -596,7 +646,10 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
     // Define headers
     let headers: string[] = [];
     let csvData: (string | number)[][] = [];
-    let filename = `${params.invoiceType}_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
+    let filename = `${params.invoiceType}_invoices_${format(
+      new Date(),
+      "yyyy-MM-dd_HH-mm-ss"
+    )}.csv`;
 
     if (params.exportType === "titan") {
       const sortedData = [...invoices].sort(
@@ -628,7 +681,10 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
         row.totalTaxGST ?? "",
         row.totalInvoiceValue ?? "",
       ]);
-      filename = `titan_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
+      filename = `titan_invoices_${format(
+        new Date(),
+        "yyyy-MM-dd_HH-mm-ss"
+      )}.csv`;
     } else if (params.exportType === "gst") {
       const sortedData = [...invoices].sort(
         (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
@@ -657,11 +713,14 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
           product.rate ?? 0,
           Number(product.taxableValue ?? "0"),
           (product.cgstRate ?? 0) + (product.sgstRate ?? 0),
-          (Number(product.cgstAmt ?? "0")) + (Number(product.sgstAmt ?? "0")),
+          Number(product.cgstAmt ?? "0") + Number(product.sgstAmt ?? "0"),
           Number(product.productTotalValue ?? "0"),
         ]);
       });
-      filename = `gst_invoices_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`;
+      filename = `gst_invoices_${format(
+        new Date(),
+        "yyyy-MM-dd_HH-mm-ss"
+      )}.csv`;
     } else {
       headers = [
         "Invoice No",
@@ -707,10 +766,14 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
     // Create CSV content
     const csvContent = [
       headers.join(","),
-      ...csvData.map((row) => row.map((cell: string | number | undefined | null) => (cell === undefined || cell === null ? "" : `"${cell}"`)).join(",")),
+      ...csvData.map((row) =>
+        row
+          .map((cell: string | number | undefined | null) =>
+            cell === undefined || cell === null ? "" : `"${cell}"`
+          )
+          .join(",")
+      ),
     ].join("\n");
-
-    
 
     return {
       content: csvContent,
@@ -737,7 +800,8 @@ export const getInvoiceStatistics = async (
     let currentMonthTotal = 0;
     let totalInvoices = 0;
     let totalValue = 0;
-    let monthlyBreakdown: { month: string; total: number; count: number }[] = [];
+    let monthlyBreakdown: { month: string; total: number; count: number }[] =
+      [];
 
     if (invoiceType === "gst") {
       // Get current month invoices
@@ -891,7 +955,9 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
     const skip = (page - 1) * pageSize;
 
     // Build where conditions
-    const whereConditions: Prisma.CustomerWhereInput | Prisma.LocalCustomerWhereInput = {
+    const whereConditions:
+      | Prisma.CustomerWhereInput
+      | Prisma.LocalCustomerWhereInput = {
       userId,
     };
 
@@ -975,7 +1041,10 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
     }
 
     // Transform data to consistent format
-    const transformedCustomers: (FilteredCustomerData | FilteredLocalCustomerData)[] = customers.map((customer) => {
+    const transformedCustomers: (
+      | FilteredCustomerData
+      | FilteredLocalCustomerData
+    )[] = customers.map((customer) => {
       if (customerType === "gst") {
         const gstCustomer = customer as Customer;
         return {
@@ -993,7 +1062,7 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
         const localCustomer = customer as LocalCustomer;
         return {
           id: localCustomer.id,
-          userId: localCustomer.userId || '',
+          userId: localCustomer.userId || "",
           customerName: localCustomer.customerName,
           address: localCustomer.address,
           createdAt: localCustomer.createdAt,
@@ -1030,7 +1099,9 @@ export const filterProducts = async (params: ProductFilterParams) => {
     const skip = (page - 1) * pageSize;
 
     // Build where conditions
-    const whereConditions: Prisma.ProductWhereInput | Prisma.LocalProductWhereInput = {
+    const whereConditions:
+      | Prisma.ProductWhereInput
+      | Prisma.LocalProductWhereInput = {
       userId,
     };
 
@@ -1097,7 +1168,10 @@ export const filterProducts = async (params: ProductFilterParams) => {
     }
 
     // Transform data to consistent format
-    const transformedProducts: (FilteredProductData | FilteredLocalProductData)[] = products.map((product) => {
+    const transformedProducts: (
+      | FilteredProductData
+      | FilteredLocalProductData
+    )[] = products.map((product) => {
       if (productType === "gst") {
         const gstProduct = product as Product;
         return {
@@ -1114,7 +1188,7 @@ export const filterProducts = async (params: ProductFilterParams) => {
         const localProduct = product as LocalProduct;
         return {
           id: localProduct.id,
-          userId: localProduct.userId || '', // Assuming userId can be null for LocalProduct
+          userId: localProduct.userId || "", // Assuming userId can be null for LocalProduct
           productName: localProduct.productName,
           createdAt: localProduct.createdAt,
           updatedAt: localProduct.updatedAt,
@@ -1230,11 +1304,7 @@ export const exportCustomersToCSV = async (params: CustomerFilterParams) => {
       "Customer Name",
       "Address",
       ...(params.customerType === "gst"
-        ? [
-            "GST Number",
-            "State",
-            "State Code",
-          ]
+        ? ["GST Number", "State", "State Code"]
         : []),
       "Created Date",
     ];
@@ -1373,17 +1443,17 @@ export const exportProductsToCSV = async (params: ProductFilterParams) => {
     }
 
     // Define headers
-    const headers = params.productType === "gst" ? [
-      "Product Name",
-      "HSN Code",
-      "CGST Rate",
-      "SGST Rate",
-      "Total GST Rate",
-      "Created Date",
-    ] : [
-      "Product Name",
-      "Created Date",
-    ];
+    const headers =
+      params.productType === "gst"
+        ? [
+            "Product Name",
+            "HSN Code",
+            "CGST Rate",
+            "SGST Rate",
+            "Total GST Rate",
+            "Created Date",
+          ]
+        : ["Product Name", "Created Date"];
 
     // Transform data for CSV
     const csvData = products.map((product) => {

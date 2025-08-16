@@ -59,35 +59,20 @@ export const LocalInvoiceTableWithFilter = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { invoices, totalCount, currentPage, loading, filterInvoices } =
-    useInvoiceFilter(session?.user?.id || "");
-
-  const loadFilterOptions = useCallback(async () => {
-    if (!session?.user?.id) return;
-    try {
-      // Assuming getMonths and getCustomers are defined elsewhere or will be added.
-      // For now, they are placeholders.
-      // const [months, customers] = await Promise.all([
-      //   getMonths("local"),
-      //   getCustomers("local"),
-      // ]);
-    } catch (error) {
-      console.error("Error loading filter options:", error);
-    }
-  }, [session?.user?.id]);
+  const { invoices, totalCount, loading, filterInvoices } = useInvoiceFilter(
+    session?.user?.id || ""
+  );
 
   // Load initial data and filter options
   useEffect(() => {
     if (session?.user?.id) {
-      loadFilterOptions();
-      // Apply initial filter with all invoices
       filterInvoices({
         invoiceType: "local",
         page: 1,
         pageSize: 10,
       });
     }
-  }, [session?.user?.id, filterInvoices, loadFilterOptions]);
+  }, [session?.user?.id, filterInvoices]);
 
   // Function to refetch data after successful operations
   const refetchData = useCallback(() => {
@@ -144,10 +129,19 @@ export const LocalInvoiceTableWithFilter = () => {
   };
 
   // Handle pagination change
-  const handlePaginationChange = useCallback(({ pageIndex, pageSize: newPageSize }: { pageIndex: number; pageSize: number }) => {
-    setPage(pageIndex + 1);
-    setPageSize(newPageSize);
-  }, []);
+  const handlePaginationChange = useCallback(
+    ({
+      pageIndex,
+      pageSize: newPageSize,
+    }: {
+      pageIndex: number;
+      pageSize: number;
+    }) => {
+      setPage(pageIndex + 1);
+      setPageSize(newPageSize);
+    },
+    []
+  );
 
   // Bulk download selected invoices as a single PDF
   const handleBulkDownload = async (
@@ -266,7 +260,7 @@ export const LocalInvoiceTableWithFilter = () => {
         if (!dateValue) return null;
         return (
           <div className="text-center">
-            {format(new Date(dateValue), "dd-MM-yyyy")}
+            {format(new Date(dateValue), "dd-MMM-yyyy")}
           </div>
         );
       },
@@ -288,6 +282,13 @@ export const LocalInvoiceTableWithFilter = () => {
       ),
     },
     {
+      accessorKey: "address",
+      header: "Address",
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("address")}</div>
+      ),
+    },
+    {
       accessorKey: "product",
       header: "Products",
       cell: ({ row }) => {
@@ -303,9 +304,16 @@ export const LocalInvoiceTableWithFilter = () => {
             <div className="flex flex-col gap-2 p-2 w-full">
               {pricedProducts.length > 0 ? (
                 pricedProducts.map((product, index) => (
-                  <div key={index} className="flex justify-between items-center w-full">
-                    <span className="capitalize font-semibold">{product.productName}</span>
-                    <span className="text-sm text-gray-500">Qty: {product.qty}, Rate: {product.rate}</span>
+                  <div
+                    key={index}
+                    className="flex justify-between items-center w-full"
+                  >
+                    <span className="capitalize text-sm">
+                      {product.productName}
+                    </span>
+                    <span className="text-sm text-primary font-semibold">
+                      &nbsp;:&nbsp;Qty: {product.qty}, Rate: {product.rate}
+                    </span>
                   </div>
                 ))
               ) : (
@@ -399,7 +407,7 @@ export const LocalInvoiceTableWithFilter = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filter Invoices
+            Filter General Invoices
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -414,48 +422,6 @@ export const LocalInvoiceTableWithFilter = () => {
                 onChange={(e) => applyFilters({ globalSearch: e.target.value })}
               />
             </div>
-
-            {/* Month Filter */}
-            {/* <div className="space-y-2">
-              <Label htmlFor="month-filter">Month</Label>
-              <Select
-                value={filterState.month || ""}
-                onValueChange={(value) => applyFilters({ month: value || undefined })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Months</SelectItem>
-                  {availableMonths.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
-
-            {/* Customer Filter */}
-            {/* <div className="space-y-2">
-              <Label htmlFor="customer-filter">Customer</Label>
-              <Select
-                value={filterState.customerId || ""}
-                onValueChange={(value) => applyFilters({ customerId: value || undefined })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Customers</SelectItem>
-                  {availableCustomers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.customerName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
 
             {/* Date Range Filter */}
             <div className="space-y-2">
@@ -475,28 +441,6 @@ export const LocalInvoiceTableWithFilter = () => {
               />
             </div>
           </div>
-
-          {/* Export Buttons */}
-          {/* <div className="flex gap-2 mt-4">
-            <Button
-              onClick={() => handleExport("xlsx")}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              Export XLSX
-            </Button>
-            <Button
-              onClick={() => handleExport("csv")}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              Export CSV
-            </Button>
-          </div> */}
         </CardContent>
       </Card>
 
@@ -555,7 +499,7 @@ export const LocalInvoiceTableWithFilter = () => {
           },
         ]}
         defaultVisibility={{
-          address: false, // Hide address column by default
+          address: true, // Hide address column by default
         }}
         onPaginationChange={handlePaginationChange}
         pageSizeOptions={[10, 25, 50, 100]}

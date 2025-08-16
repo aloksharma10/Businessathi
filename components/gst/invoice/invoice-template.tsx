@@ -148,26 +148,30 @@ export const InvoiceTemplate = ({
             </div>
 
             <div>
-              {invoiceInfo?.pricedProducts?.map((item: PricedProduct, i: number) => (
-                <div key={item.id} className="flex w-full text-center">
-                  <div className="border-r border-black dark:border-white w-10">
-                    {i + 1}
+              {invoiceInfo?.pricedProducts?.map(
+                (item: PricedProduct, i: number) => (
+                  <div key={item.id} className="flex w-full text-center">
+                    <div className="border-r border-black dark:border-white w-10">
+                      {i + 1}
+                    </div>
+                    <div className="border-r border-black dark:border-white w-[322px] text-start px-1 font-bold">
+                      {item?.product?.productName}
+                    </div>
+                    <div className="border-r border-black dark:border-white w-[4.5rem]">
+                      {item?.product?.hsnCode}
+                    </div>
+                    <div className="border-r border-black dark:border-white w-20">
+                      {item?.qty}
+                    </div>
+                    <div className="border-r border-black dark:border-white w-20">
+                      {item?.rate.toFixed(2)}
+                    </div>
+                    <div className="w-32 text-end pr-1">
+                      {item?.taxableValue}
+                    </div>
                   </div>
-                  <div className="border-r border-black dark:border-white w-[322px] text-start px-1 font-bold">
-                    {item?.product?.productName}
-                  </div>
-                  <div className="border-r border-black dark:border-white w-[4.5rem]">
-                    {item?.product?.hsnCode}
-                  </div>
-                  <div className="border-r border-black dark:border-white w-20">
-                    {item?.qty}
-                  </div>
-                  <div className="border-r border-black dark:border-white w-20">
-                    {item?.rate.toFixed(2)}
-                  </div>
-                  <div className="w-32 text-end pr-1">{item?.taxableValue}</div>
-                </div>
-              ))}
+                )
+              )}
             </div>
 
             {unfilledArray.map((_, i) => (
@@ -512,8 +516,12 @@ const UnfilledProductTable = () => {
   return (
     <div className="flex items-center text-center">
       <div className="border-r border-black dark:border-white w-10"> </div>
-      <div className="border-r border-black dark:border-white w-[322px] px-1"> </div>
-      <div className="border-r border-black dark:border-white w-[4.5rem]"> </div>
+      <div className="border-r border-black dark:border-white w-[322px] px-1">
+         
+      </div>
+      <div className="border-r border-black dark:border-white w-[4.5rem]">
+         
+      </div>
       <div className="border-r border-black dark:border-white w-20"> </div>
       <div className="border-r border-black dark:border-white w-20"> </div>
       <div className="w-32 pr-1"></div>

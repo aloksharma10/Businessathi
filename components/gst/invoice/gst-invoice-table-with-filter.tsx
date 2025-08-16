@@ -387,7 +387,7 @@ export const GstInvoiceTableWithFilter = () => {
         },
         cell: ({ row }) => (
           <div className="text-center">
-            {format(row.getValue("invoiceDate"), "dd-MM-yyyy")}
+            {format(row.getValue("invoiceDate"), "dd-MMM-yyyy")}
           </div>
         ),
         enableSorting: false,
@@ -429,7 +429,7 @@ export const GstInvoiceTableWithFilter = () => {
           return (
             <HoverCardToolTip
               side="top"
-              label="Product"
+              label="Products"
               align="center"
               className="min-w-max"
             >
@@ -441,10 +441,10 @@ export const GstInvoiceTableWithFilter = () => {
                       className="flex justify-between items-center w-full"
                     >
                       <span className="capitalize text-sm">
-                        {product.productName}:
+                        {product.productName}
                       </span>
                       <span className="text-sm text-primary font-semibold">
-                        Qty: {product.qty}, Rate: {product.rate}
+                        &nbsp;:&nbsp;Qty: {product.qty}, Rate: {product.rate}
                       </span>
                     </div>
                   ))
