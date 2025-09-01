@@ -4,6 +4,7 @@ import { formatCurrencyForIndia } from "@/lib/utils";
 import { Users } from "@prisma/client";
 import { format } from "date-fns";
 import { ToWords } from "to-words";
+import { parse } from "date-fns";
 
 export const LocalInvoiceTemplate = ({
   invoiceInfo,
@@ -35,7 +36,7 @@ export const LocalInvoiceTemplate = ({
             <div className="flex">
               <div className="flex-1">
                 <div className="border-black dark:border-white border-r border-b px-1">
-                  <p className="font-bold">{companyInfo.companyName}</p>
+                  <p className="font-bold">{companyInfo.localCompanyName}</p>
                   <p>({companyInfo.localTagLine})</p>
                   <p className="w-[90%]">{companyInfo.localAddress}</p>
                   <p>
@@ -54,29 +55,29 @@ export const LocalInvoiceTemplate = ({
                 </div>
               </div>
 
-              <div>
+              <div className="w-[35%]">
                 <div className="grid grid-cols-2 justify-between border-b border-black dark:border-white w-full">
-                  <div className="border-r border-b px-1 border-black dark:border-white">
+                  <div className="border-r border-b px-[2px] border-black dark:border-white">
                     Invoice No.
                     <p className="font-bold">{invoiceInfo?.localInvoiceNo}</p>
                   </div>
-                  <div className="px-1 border-black dark:border-white border-b">
+                  <div className="px-[2px] border-black dark:border-white border-b">
                     Dated
                     <p className="font-bold">
                       {format(invoiceInfo?.localInvoiceDate, "dd-MM-yyyy")}
                     </p>
                   </div>
-                  <div className="px-1 border-black dark:border-white border-r">
+                  <div className="px-[2px] border-black dark:border-white border-r">
                     Month
                     <p className="font-bold">
-                      {invoiceInfo?.monthOf}, {invoiceInfo?.yearOf}
+                      {format(parse(`${invoiceInfo?.monthOf} ${invoiceInfo?.yearOf}`, "MMMM yyyy", new Date()), "MMM yyyy")}
                     </p>
                   </div>
-                  <div className="px-1 border-black dark:border-white">
+                  <div className="px-[2px] border-black dark:border-white">
                     References
                   </div>
                 </div>
-                <div className="px-1 border-black dark:border-white">
+                <div className="px-[2px] border-black dark:border-white">
                   Terms of Delivery
                 </div>
               </div>
@@ -87,7 +88,7 @@ export const LocalInvoiceTemplate = ({
                 <div className="w-[5.3rem] border-r border-b border-t border-black dark:border-white px-[2px]">
                   Sl No.
                 </div>
-                <div className="w-[600px] border-r border-b border-t border-black dark:border-white px-1">
+                <div className="w-[580px] border-r border-b border-t border-black dark:border-white px-1">
                   Description of Goods
                 </div>
                 <div className="w-36 border-r border-b border-t border-black dark:border-white">
@@ -96,7 +97,7 @@ export const LocalInvoiceTemplate = ({
                 <div className="w-32 border-r border-b border-t border-black dark:border-white">
                   Rate
                 </div>
-                <div className="w-40 border-b border-t border-black dark:border-white">
+                <div className="w-48 border-b border-t border-black dark:border-white">
                   Amount
                 </div>
               </div>
@@ -110,7 +111,7 @@ export const LocalInvoiceTemplate = ({
                     <div className="w-[5.3rem] border-r border-black dark:border-white px-[2px]">
                       {i + 1}
                     </div>
-                    <div className="w-[600px] border-r border-black dark:border-white text-start px-1 font-bold">
+                    <div className="w-[580px] border-r border-black dark:border-white text-start px-1 font-bold">
                       {item.product?.productName}
                     </div>
                     <div className="w-36 border-r border-black dark:border-white">
@@ -119,7 +120,7 @@ export const LocalInvoiceTemplate = ({
                     <div className="w-32 border-r border-black dark:border-white">
                       {item.rate.toFixed(2)}
                     </div>
-                    <div className="w-40 border-black dark:border-white">
+                    <div className="w-48 border-black dark:border-white">
                       {item.productTotalValue}
                     </div>
                   </div>
@@ -134,7 +135,7 @@ export const LocalInvoiceTemplate = ({
                 <div className="w-[5.3rem] border-r border-black dark:border-white px-[2px]">
                   &nbsp;
                 </div>
-                <div className="w-[600px] border-r border-black dark:border-white text-end px-1">
+                <div className="w-[580px] border-r border-black dark:border-white text-end px-1">
                   Total
                 </div>
                 <div className="w-36 border-r border-black dark:border-white">
@@ -143,7 +144,7 @@ export const LocalInvoiceTemplate = ({
                 <div className="w-32 border-r border-black dark:border-white">
                   &nbsp;
                 </div>
-                <div className="w-40 border-black dark:border-white font-bold">
+                <div className="w-48 border-black dark:border-white font-bold">
                   {formatCurrencyForIndia(invoiceInfo.localTotalInvoiceValue)}
                 </div>
               </div>
@@ -163,7 +164,7 @@ export const LocalInvoiceTemplate = ({
                 </p>
               </div>
               <div className="flex flex-col justify-between w-[30%] items-end">
-                <div className="font-bold">for {companyInfo?.companyName}</div>
+                <div className="font-bold">for {companyInfo?.localCompanyName}</div>
                 <div>Authorised Signatory</div>
               </div>
             </div>
@@ -180,12 +181,12 @@ const UnfilledProductTable = () => {
       <div className="w-[5.3rem] border-r border-black dark:border-white px-[2px]">
         &nbsp;
       </div>
-      <div className="w-[600px] border-r border-black dark:border-white text-end px-1">
+      <div className="w-[580px] border-r border-black dark:border-white text-end px-1">
         &nbsp;
       </div>
       <div className="w-36 border-r border-black dark:border-white">&nbsp;</div>
       <div className="w-32 border-r border-black dark:border-white">&nbsp;</div>
-      <div className="w-40 border-black dark:border-white">&nbsp;</div>
+      <div className="w-48 border-black dark:border-white">&nbsp;</div>
     </div>
   );
 };

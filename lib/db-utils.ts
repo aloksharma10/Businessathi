@@ -67,6 +67,6 @@ export const getLastGSTInvoiceNo = async (userId: string): Promise<any> => {
   } catch (error) {
     console.log(error, "error");
     console.error("Error fetching last gst invoice number:", error);
-    return 1000;
+    return 387;
   }
 };
