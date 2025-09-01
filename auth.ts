@@ -40,17 +40,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials) => {
         let user = null;
 
-        // user = await getUserFromDb(
-        //   credentials.email as string,
-        //   credentials.password as string
-        // );
+        user = await getUserFromDb(
+          credentials.email as string,
+          credentials.password as string
+        );
 
-        const rs = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
-          method: "POST",
-          body: JSON.stringify(credentials),
-        });
-        const data = await rs.json();
-        user = data.user;
+        // const rs = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+        //   method: "POST",
+        //   body: JSON.stringify(credentials),
+        // });
+        // const data = await rs.json();
+        // user = data.user;
 
         if (!user) {
           return null;
