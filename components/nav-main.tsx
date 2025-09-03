@@ -21,7 +21,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { Spinner } from "@/components/spinner"
 import { ForwardRefExoticComponent, RefAttributes, useCallback } from "react"
 
 export function NavMain({

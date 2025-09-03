@@ -27,7 +27,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useInvoiceFilter } from "@/hooks/use-invoice-filter";
 import { useSession } from "next-auth/react";
@@ -397,11 +397,17 @@ export const GstInvoiceTableWithFilter = () => {
         header: () => {
           return <div className="text-center">Month</div>;
         },
-        cell: ({ row }) => (
-          <div className="capitalize text-center">
-            {row.getValue("monthOf")}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const year = row.original.yearOf;
+          const month = row.original.monthOf;
+          const date = parse(`${month} ${year}`, "MMMM yyyy", new Date());
+
+          return (
+            <div className="capitalize text-center">
+              {format(date, "MMM yyyy")}
+            </div>
+          );
+        },
         enableSorting: false,
       },
       {
