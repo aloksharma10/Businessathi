@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import puppeteer from "puppeteer";
+
+const BASE_URL =
+  process.env.APP_URL || "https://businessathi.acnexttech.com";
+
 import { PDFDocument } from "pdf-lib";
 
 export async function GET(req: NextRequest) {
@@ -17,10 +21,10 @@ export async function GET(req: NextRequest) {
     const invoiceUrls: string[] = [];
 
     if (invoiceId) {
-      invoiceUrls.push(`${req.nextUrl.origin}/gst/${invoiceId}/pdf-view`);
+      invoiceUrls.push(`${BASE_URL}/gst/${invoiceId}/pdf-view`);
     } else if (invoiceIds.length > 0) {
       invoiceIds.forEach((id) => {
-        invoiceUrls.push(`${req.nextUrl.origin}/gst/${id}/pdf-view`);
+        invoiceUrls.push(`${BASE_URL}/gst/${id}/pdf-view`);
       });
     } else {
       return new NextResponse("Missing invoice ID(s)", { status: 400 });
