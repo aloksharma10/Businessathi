@@ -1,6 +1,8 @@
 import { InvoiceTemplate } from "@/components/gst/invoice/invoice-template";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
+import { toZonedTime } from "date-fns-tz";
+
 
 // Add print-specific CSS - copy from invoice-template.tsx
 const printStyles = `
@@ -72,7 +74,7 @@ export default async function InvoicePdfViewPage({
       <body>
         <div id="divToPrint">
           <InvoiceTemplate
-            invoiceInfo={invoiceInfo}
+            invoiceInfo={{...invoiceInfo, invoiceDate: toZonedTime(invoiceInfo?.invoiceDate, "Asia/Kolkata")}}
             companyInfo={companyInfo}
           />
         </div>
