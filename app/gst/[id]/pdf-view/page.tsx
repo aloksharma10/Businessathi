@@ -74,6 +74,7 @@ export default async function InvoicePdfViewPage({
       <body>
         <div id="divToPrint">
           <InvoiceTemplate
+            // @ts-ignore
             invoiceInfo={{...invoiceInfo, invoiceDate: toZonedTime(invoiceInfo?.invoiceDate, "Asia/Kolkata")}}
             companyInfo={companyInfo}
           />
