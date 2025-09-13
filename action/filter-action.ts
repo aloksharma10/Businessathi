@@ -14,6 +14,7 @@ import {
   LocalCustomPrice,
   CustomPrice,
 } from "@prisma/client";
+import { toZonedTime } from "date-fns-tz";
 
 // Types for filter parameters
 export interface InvoiceFilterParams {
@@ -516,7 +517,10 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
 
         return {
           "Invoice Number": row.invoiceNo,
-          "Invoice Date": format(row.invoiceDate, "dd-MM-yyyy"),
+          "Invoice Date": toZonedTime(
+            row.invoiceDate,
+            "Asia/Kolkata"
+          ).toISOString(),
           "Store Code": StoreCode, // new field with extracted code
           Month: row.monthOf,
           "Aquafina Jar": row.pricedProducts.find(
@@ -540,7 +544,10 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
       exportData = sortedData.flatMap((invoice) => {
         return invoice.pricedProducts.map((product: PricedProduct) => ({
           "Invoice No": invoice.invoiceNo,
-          "Invoice Date": format(invoice.invoiceDate, "dd-MM-yyyy"),
+          "Invoice Date": toZonedTime(
+            invoice.invoiceDate,
+            "Asia/Kolkata"
+          ).toISOString(),
           "Customer Name": invoice.customerName,
           "Customer GST": invoice.gstIn,
           "Product Name": product.productName,
