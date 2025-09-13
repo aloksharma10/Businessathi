@@ -517,10 +517,10 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
 
         return {
           "Invoice Number": row.invoiceNo,
-          "Invoice Date": toZonedTime(
-            row.invoiceDate,
-            "Asia/Kolkata"
-          ).toISOString(),
+          "Invoice Date": format(
+            toZonedTime(row.invoiceDate, "Asia/Kolkata"),
+            "dd-MM-yyyy"
+          ),
           "Store Code": StoreCode, // new field with extracted code
           Month: row.monthOf,
           "Aquafina Jar": row.pricedProducts.find(
@@ -544,10 +544,10 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
       exportData = sortedData.flatMap((invoice) => {
         return invoice.pricedProducts.map((product: PricedProduct) => ({
           "Invoice No": invoice.invoiceNo,
-          "Invoice Date": toZonedTime(
-            invoice.invoiceDate,
-            "Asia/Kolkata"
-          ).toISOString(),
+          "Invoice Date": format(
+            toZonedTime(invoice.invoiceDate, "Asia/Kolkata"),
+            "dd-MM-yyyy"
+          ),
           "Customer Name": invoice.customerName,
           "Customer GST": invoice.gstIn,
           "Product Name": product.productName,
