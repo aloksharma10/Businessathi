@@ -22,6 +22,8 @@ export const CreateInvoice = async (
         pricedProducts: {
           create: values.productPrices.map((product: any) => {
             return {
+              cgstRate: product.cgstRate,
+              sgstRate: product.sgstRate,
               productId: product.id,
               qty: Number(product.qty),
               taxableValue: product.taxableValue.toString(),
@@ -65,6 +67,8 @@ export const UpdateInvoice = async (values: any): Promise<boolean> => {
           deleteMany: {},
           create: values.productPrices.map((product: any) => {
             return {
+              cgstRate: product.cgstRate,
+              sgstRate: product.sgstRate,
               productId: product.id,
               qty: Number(product.qty),
               taxableValue: product.taxableValue.toString(),
@@ -153,3 +157,27 @@ export const updateLocalInvoice = async (id: string, values: any) => {
     console.log(error, "[updateLocalInvoice]");
   }
 };
+
+// export const _updateInoivce = async () => {
+//   try {
+//     const allProducts = await prisma.product.findMany();
+//     console.log(allProducts.length, 'productlenth')
+//     for (const product of allProducts) {
+//       const updateInc = await prisma.customPrice.updateMany({
+//         where: {
+//           productId: product.id,
+//         },
+//         data: {
+//           cgstRate: product.cgstRate,
+//           sgstRate: product.sgstRate
+//         },
+//       });
+//     }
+
+//     console.log("don")
+//   } catch (error) {
+//     console.log(error, "error");
+//   }
+// };
+
+// _updateInoivce().then(e=>console.log("running _updateInoivce")).catch(e=>console.log('error', e))

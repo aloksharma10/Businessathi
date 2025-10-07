@@ -7,6 +7,8 @@ interface PricedProduct {
   id: string;
   cgstAmt: number;
   sgstAmt: number;
+  cgstRate: number;
+  sgstRate: number;
   product: {
     productName: string;
     hsnCode: string;
@@ -355,8 +357,8 @@ export const InvoiceTemplate = ({
                   {invoiceInfo.isOutsideDelhiInvoice ? (
                     <div className="flex">
                       <div className="w-12 border-b border-r border-black dark:border-white">
-                        {Number(item?.product?.cgstRate) +
-                          Number(item?.product?.sgstRate)}
+                        {Number(item?.cgstRate) +
+                          Number(item?.sgstRate)}
                         %
                       </div>
                       <div className="w-16 border-b border-r border-black dark:border-white">
@@ -369,7 +371,7 @@ export const InvoiceTemplate = ({
                     <>
                       <div className="flex">
                         <div className="w-12 border-b border-r border-black dark:border-white">
-                          {Number(item?.product?.cgstRate)}%
+                          {Number(item?.cgstRate)}%
                         </div>
                         <div className="w-16 border-b border-r border-black dark:border-white">
                           {Number(item?.cgstAmt).toFixed(2)}
@@ -378,7 +380,7 @@ export const InvoiceTemplate = ({
 
                       <div className="flex">
                         <div className="w-12 border-b border-r border-black dark:border-white">
-                          {Number(item?.product?.sgstRate)}%
+                          {Number(item?.sgstRate)}%
                         </div>
                         <div className="w-16 border-b border-r border-black dark:border-white">
                           {Number(item?.sgstAmt).toFixed(2)}

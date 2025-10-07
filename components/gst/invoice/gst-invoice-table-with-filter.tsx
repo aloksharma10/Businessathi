@@ -12,6 +12,7 @@ import {
   Filter,
   XCircle,
   LoaderCircle,
+  Loader,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { downloadButtonInColumn, downloadInvoicePDF } from "@/lib/utils";
+import { cn, downloadButtonInColumn, downloadInvoicePDF } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -61,6 +62,7 @@ export const GstInvoiceTableWithFilter = () => {
   const debouncedSearchValue = useDebounce(searchValue, 400); // Debounce with 400ms
   const { onOpen } = useModal();
   const isMobile = useIsMobile();
+  const [loadingInvoices, setLoadingInvoices] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
 
   const {
@@ -354,6 +356,8 @@ export const GstInvoiceTableWithFilter = () => {
         cell: ({ row }) => {
           const id = row.original.id;
           const invoiceNo = row.original.invoiceNo;
+          const isRowLoading = loadingInvoices.has(id);
+          const Icon = isRowLoading ? Loader : Download
           return (
             <div className="flex items-center justify-center">
               {row.getValue("invoiceNo")}
@@ -361,17 +365,26 @@ export const GstInvoiceTableWithFilter = () => {
                 <TooltipTrigger asChild>
                   <Button
                     className="cursor-pointer"
-                    onClick={() =>
-                      downloadButtonInColumn({
-                        invoiceId: id,
-                        invoiceNo,
-                        invoiceType: "gst",
-                      })
-                    }
+                    onClick={async() => {
+                      setLoadingInvoices(prev => new Set([...prev, id]));
+                      try {
+                        await downloadButtonInColumn({
+                          invoiceId: id,
+                          invoiceNo,
+                          invoiceType: "gst",
+                        });
+                      } finally {
+                        setLoadingInvoices(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(id);
+                          return newSet;
+                        });
+                      }
+                    }}
                     variant={"link"}
                     size={"icon"}
                   >
-                    <Download className="ml-2 h-4 w-4 text-green-600" />
+                    <Icon className={cn("ml-2 h-4 w-4 text-green-600", isRowLoading && "animate-spin")} key={id} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Download PDF</TooltipContent>
@@ -539,7 +552,7 @@ export const GstInvoiceTableWithFilter = () => {
         },
       },
     ],
-    []
+    [loadingInvoices]
   );
 
   const isFilterActive = useMemo(

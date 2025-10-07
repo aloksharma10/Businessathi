@@ -64,6 +64,10 @@ model CustomPrice {
   qty               Int    @db.Int
   rate              Float
   taxableValue      String
+  
+  cgstRate    Float?
+  sgstRate    Float?
+
   cgstAmt           String
   sgstAmt           String
   productTotalValue String
