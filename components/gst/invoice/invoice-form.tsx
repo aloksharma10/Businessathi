@@ -242,8 +242,8 @@ export const InvoiceForm = ({
             ? "Invoice updated successfully"
             : "Invoice created successfully"
         );
-        // form.reset();
-        // await fetchLastInvoiceNo(); // Refresh invoice number after successful submission
+        form.reset();
+        await fetchLastInvoiceNo(); // Refresh invoice number after successful submission
       }
     } catch (error) {
       toast.error("Failed to create invoice");
