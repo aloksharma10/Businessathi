@@ -20,7 +20,7 @@ export const EditLocalInvoiceModal = () => {
     LocalCustomer[] | null | undefined
   >([]);
   const [products, setProducts] = useState<LocalProduct[] | null | undefined>(
-    []
+    [],
   );
 
   const session = useSession();
@@ -50,21 +50,21 @@ export const EditLocalInvoiceModal = () => {
   };
 
   return (
-    <Sheet open={isOpenModel} onOpenChange={handleClose}>
-      <SheetContent className="md:min-w-[700px]">
-        <SheetHeader>
-          <SheetTitle>{session.data?.user.companyName}</SheetTitle>
+    <Sheet open={isOpenModel} onOpenChange={handleClose} >
+      <SheetContent className="md:min-w-[700px] w-full p-0">
+        <SheetHeader className="m-2 rounded-lg p-4 border-2 text-zinc-900 dark:text-white text-left flex text-xl font-semibold">
+          <SheetTitle className="p-0 m-0">Edit Local Invoice</SheetTitle>
           <SheetDescription>
             Update the invoice&apos;s information as needed.
           </SheetDescription>
-          <LocalInvoiceForm
-            mode={"edit"}
-            userId={userId}
-            localInvoiceData={data.localInvoice}
-            customers={customers as LocalCustomer[]}
-            products={products as any[]}
-          />
         </SheetHeader>
+        <LocalInvoiceForm
+          mode={"edit"}
+          userId={userId}
+          localInvoiceData={data.localInvoice}
+          customers={customers as LocalCustomer[]}
+          products={products as any[]}
+        />
       </SheetContent>
     </Sheet>
   );

@@ -198,3 +198,29 @@ model LocalInvoice {
 
   @@unique([localInvoiceNo, userId], name: "unique_local_invoice_user")
 }
+
+// model PlantCustomer {
+//   id String @id @default(auto()) @map("_id") @db.ObjectId
+//   customerName String @db.String
+//   address      String @db.String
+//   userId String? @db.ObjectId
+//   user   Users?  @relation(fields: [userId], references: [id])
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+// model PlantCustomerProduct {
+//   id String @id @default(auto()) @map("_id") @db.ObjectId
+
+// customerId String @db.ObjectId
+// customer PlantCustomer @relation(fields: [customerId], references: [id])
+
+// productId String @db.ObjectId
+// product PlantProduct @relation(fields: [productId], references: [id])
+
+// notes String? @db.String
+
+//   time_stamp DateTime @default(now())
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }

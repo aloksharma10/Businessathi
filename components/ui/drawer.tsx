@@ -1,118 +1,145 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
+import { cn } from '@/lib/utils';
+import { ComponentProps } from 'react';
+import { ContentProps, Drawer } from 'vaul';
 
-import { cn } from "@/lib/utils"
+export type DrawerSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'screen';
 
-const Drawer = ({
-  shouldScaleBackground = true,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-)
-Drawer.displayName = "Drawer"
+export type DrawerSide = 'right' | 'left' | 'top' | 'bottom';
 
-const DrawerTrigger = DrawerPrimitive.Trigger
-
-const DrawerPortal = DrawerPrimitive.Portal
-
-const DrawerClose = DrawerPrimitive.Close
-
-const DrawerOverlay = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
-    ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/80", className)}
-    {...props}
-  />
-))
-DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName
-
-const DrawerContent = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
-        className
-      )}
-      {...props}
-    >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-))
-DrawerContent.displayName = "DrawerContent"
-
-const DrawerHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)}
-    {...props}
-  />
-)
-DrawerHeader.displayName = "DrawerHeader"
-
-const DrawerFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-    {...props}
-  />
-)
-DrawerFooter.displayName = "DrawerFooter"
-
-const DrawerTitle = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Title
-    ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
-    {...props}
-  />
-))
-DrawerTitle.displayName = DrawerPrimitive.Title.displayName
-
-const DrawerDescription = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-DrawerDescription.displayName = DrawerPrimitive.Description.displayName
-
-export {
-  Drawer,
-  DrawerPortal,
-  DrawerOverlay,
-  DrawerTrigger,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
+function getDrawerWidth(size: DrawerSize): string {
+  switch (size) {
+    case 'xs':
+      return 'lg:w-[300px]';
+    case 'sm':
+      return 'lg:w-[400px]';
+    case 'md':
+      return 'lg:w-[540px]';
+    case 'lg': // greater-mid
+      return 'lg:w-[680px]';
+    case 'xl':
+      return 'lg:w-[1080px]';
+    case 'full':
+      return 'lg:w-[90vw]';
+    case 'screen':
+      return 'lg:w-[100vw] h-[calc(100vh-4rem)]';
+    default:
+      return 'lg:w-[540px]';
+  }
 }
+
+function getDrawerPosition(side: DrawerSide): string {
+  switch (side) {
+    case 'left':
+      return 'left-2 top-2 bottom-2';
+    case 'top':
+      return 'top-2 left-2 right-2';
+    case 'bottom':
+      return 'bottom-2 left-2 right-2';
+    case 'right':
+    default:
+      return 'right-2 top-2 bottom-2';
+  }
+}
+
+function getDrawerTransform(side: DrawerSide): string {
+  switch (side) {
+    case 'left':
+      return 'calc(-100% - 8px)';
+    case 'top':
+      return 'calc(-100% - 8px)';
+    case 'bottom':
+      return 'calc(100% + 8px)';
+    case 'right':
+    default:
+      return 'calc(100% + 8px)';
+  }
+}
+
+function getDrawerDimension(side: DrawerSide): string {
+  switch (side) {
+    case 'top':
+    case 'bottom':
+      return 'h-[calc(100%-16px)] w-full';
+    case 'left':
+    case 'right':
+    default:
+      return 'w-[calc(100%-16px)]';
+  }
+}
+
+function SheetRoot({
+  children,
+  contentProps,
+  nested = false,
+  size = 'lg',
+  side = 'right',
+  ...rest
+}: {
+  contentProps?: ContentProps;
+  nested?: boolean;
+  size?: DrawerSize;
+  side?: DrawerSide;
+} & ComponentProps<typeof Drawer.Root>) {
+  const RootComponent = nested ? Drawer.NestedRoot : Drawer.Root;
+  return (
+    <RootComponent direction={side} handleOnly {...rest}>
+      <Drawer.Portal>
+        <Drawer.Overlay className="backdrop-blur-xs fixed inset-0 z-50 bg-neutral-50/15 bg-opacity-10" />
+
+        <Drawer.Content
+          {...contentProps}
+          onPointerDownOutside={(e) => {
+            // Don't dismiss when clicking inside a toast
+            if (e.target instanceof Element && e.target.closest('[data-sonner-toast]')) e.preventDefault();
+
+            contentProps?.onPointerDownOutside?.(e);
+          }}
+          className={cn(
+            'fixed z-50 flex flex-col',
+            'rounded-lg border border-neutral-200 bg-white outline-none dark:border-neutral-800 dark:bg-stone-900',
+            getDrawerPosition(side),
+            getDrawerDimension(side),
+            getDrawerWidth(size),
+            contentProps?.className
+          )}
+          // className={cn(
+          //   "fixed z-10 flex outline-none",
+          //   getDrawerPosition(side),
+          //   getDrawerDimension(side),
+          //   getDrawerWidth(size),
+          //   contentProps?.className,
+          // )}
+          style={
+            {
+              '--initial-transform': getDrawerTransform(side),
+              // "user-select": "auto", // Override default user-select: none from Vaul
+              ...contentProps?.style,
+            } as React.CSSProperties
+          }
+        >
+          <div className="scrollbar-hide flex size-full grow flex-col overflow-y-auto rounded-lg bg-white dark:bg-stone-900">{children}</div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </RootComponent>
+  );
+}
+
+function Title({ className, ...rest }: ComponentProps<typeof Drawer.Title>) {
+  return <Drawer.Title className={cn('text-xl font-medium text-zinc-900 dark:text-white', className)} {...rest} />;
+}
+
+function Description(props: ComponentProps<typeof Drawer.Description>) {
+  return <Drawer.Description {...props} />;
+}
+
+function Close(props: ComponentProps<typeof Drawer.Close>) {
+  return <Drawer.Close {...props} />;
+}
+
+export const DrawerComponent = Object.assign(SheetRoot, {
+  Title,
+  Description,
+  Close,
+});

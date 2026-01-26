@@ -20,7 +20,8 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
     <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
       <ProgressProvider
         height="4px"
-        color="#127dc4"
+        // color="#127dc4"
+        color="#05c7a7"
         options={{ showSpinner: false }}
         shallowRouting
       >
