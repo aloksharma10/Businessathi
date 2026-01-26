@@ -14,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrencyForIndia } from "@/lib/utils";
 import { CalendarIcon, CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 import {
   Command,
@@ -48,6 +48,8 @@ import { CreateLocalInvoice, updateLocalInvoice } from "@/action/invoice";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { getLastLocalInvoiceNo } from "@/lib/db-utils";
+import { StickyBar } from "@/components/ui/sticky-bar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const FormSchemaLocalInvoice = z.object({
   localInvoiceNo: z
@@ -68,9 +70,9 @@ export function LocalInvoiceForm({
   productDetails,
   products,
   localInvoiceData,
-  mode= "create",
+  mode = "create",
   customerId,
-  onSuccess
+  onSuccess,
 }: {
   userId: string;
   customers: LocalCustomer[];
@@ -94,7 +96,7 @@ export function LocalInvoiceForm({
 
   const currDate = new Date();
   const lastMonth = new Date(
-    currDate.setMonth(currDate.getMonth() - 1)
+    currDate.setMonth(currDate.getMonth() - 1),
   ).toLocaleString("en-US", { month: "long" });
 
   const getLastInvoice = async (userId: string): Promise<any> => {
@@ -132,7 +134,10 @@ export function LocalInvoiceForm({
   const form = useForm({
     resolver: zodResolver(FormSchemaLocalInvoice),
     defaultValues: {
-      localInvoiceNo: mode === "edit" && localInvoiceData ? localInvoiceData.localInvoiceNo : "",
+      localInvoiceNo:
+        mode === "edit" && localInvoiceData
+          ? localInvoiceData.localInvoiceNo
+          : "",
       monthOf: lastMonth,
       yearOf: currDate.getFullYear().toString(),
       localInvoiceDate: new Date(),
@@ -147,24 +152,32 @@ export function LocalInvoiceForm({
   const selectProduct = form.watch("productDetails");
 
   const currLocalCustomer = customers.find(
-    (customer: any) => customer.id === currLocalCustomerId
+    (customer: any) => customer.id === currLocalCustomerId,
   );
 
   useEffect(() => {
     if (mode === "edit" && localInvoiceData) {
       // Set basic form values
       form.setValue("localInvoiceNo", localInvoiceData.localInvoiceNo);
-      form.setValue("localInvoiceDate", new Date(localInvoiceData.localInvoiceDate));
+      form.setValue(
+        "localInvoiceDate",
+        new Date(localInvoiceData.localInvoiceDate),
+      );
       form.setValue("monthOf", localInvoiceData.monthOf);
       form.setValue("yearOf", localInvoiceData.yearOf);
       form.setValue("customerId", localInvoiceData.customerId);
-      form.setValue("localTotalInvoiceValue", Number(localInvoiceData.localTotalInvoiceValue));
+      form.setValue(
+        "localTotalInvoiceValue",
+        Number(localInvoiceData.localTotalInvoiceValue),
+      );
 
       // Map products from localInvoiceData.pricedProducts (if available)
       const pricedProducts = (localInvoiceData as any).pricedProducts;
       if (pricedProducts && pricedProducts.length > 0) {
         const mappedProducts = pricedProducts.map((pricedProduct: any) => {
-          const product = products.find((p: any) => p.id === pricedProduct.productId);
+          const product = products.find(
+            (p: any) => p.id === pricedProduct.productId,
+          );
           return {
             id: pricedProduct.productId,
             label: product?.productName || "",
@@ -179,7 +192,7 @@ export function LocalInvoiceForm({
 
         // Set product details for the multi-selector
         form.setValue("productDetails", mappedProducts);
-        
+
         // Set product prices for calculations
         setProductPrices(mappedProducts);
       }
@@ -195,16 +208,30 @@ export function LocalInvoiceForm({
         return productInfo ? { ...product, ...productInfo } : product;
       });
       // Only update if the selection has actually changed
-      if (JSON.stringify(newSelectedProducts.sort((a: any, b: any) => a.value.localeCompare(b.value))) !== JSON.stringify(productPrices.sort((a: any, b: any) => a.value.localeCompare(b.value)))) {
+      if (
+        JSON.stringify(
+          newSelectedProducts.sort((a: any, b: any) =>
+            a.value.localeCompare(b.value),
+          ),
+        ) !==
+        JSON.stringify(
+          productPrices.sort((a: any, b: any) =>
+            a.value.localeCompare(b.value),
+          ),
+        )
+      ) {
         setProductPrices(newSelectedProducts);
       }
     } else {
       // In edit mode, only update if products are actually changed
-      const currentProductIds = productPrices.map(p => p.id);
+      const currentProductIds = productPrices.map((p) => p.id);
       const selectedProductIds = selectProduct.map((p: any) => p.value);
-      
+
       // Only update if the selection has actually changed
-      if (JSON.stringify(currentProductIds.sort()) !== JSON.stringify(selectedProductIds.sort())) {
+      if (
+        JSON.stringify(currentProductIds.sort()) !==
+        JSON.stringify(selectedProductIds.sort())
+      ) {
         const newSelectedProducts = selectProduct.map((product: any) => {
           const productInfo = productPrices.find((p) => p.id === product.value);
           return productInfo ? { ...product, ...productInfo } : product;
@@ -217,7 +244,7 @@ export function LocalInvoiceForm({
   useEffect(() => {
     const totalTaxableValue = productPrices.reduce(
       (acc, product) => acc + Number(product.productTotalValue || 0),
-      0
+      0,
     );
     form.setValue("localTotalInvoiceValue", Number(totalTaxableValue));
   }, [productPrices, form]);
@@ -226,7 +253,7 @@ export function LocalInvoiceForm({
     name: string,
     value: any,
     id: string,
-    item: any
+    item: any,
   ) => {
     const updatedProductInfos = productPrices.map((product) => {
       if (product.id !== id) return product;
@@ -247,7 +274,7 @@ export function LocalInvoiceForm({
     });
 
     const productExists = updatedProductInfos.some(
-      (product) => product.id === id
+      (product) => product.id === id,
     );
 
     if (!productExists && mode === "create") {
@@ -276,17 +303,25 @@ export function LocalInvoiceForm({
     if (localInvoiceData && mode === "edit") {
       // Set basic form values
       form.setValue("localInvoiceNo", localInvoiceData.localInvoiceNo);
-      form.setValue("localInvoiceDate", new Date(localInvoiceData.localInvoiceDate));
+      form.setValue(
+        "localInvoiceDate",
+        new Date(localInvoiceData.localInvoiceDate),
+      );
       form.setValue("monthOf", localInvoiceData.monthOf);
       form.setValue("yearOf", localInvoiceData.yearOf);
       form.setValue("customerId", localInvoiceData.customerId);
-      form.setValue("localTotalInvoiceValue", Number(localInvoiceData.localTotalInvoiceValue));
+      form.setValue(
+        "localTotalInvoiceValue",
+        Number(localInvoiceData.localTotalInvoiceValue),
+      );
 
       // Map products from localInvoiceData.pricedProducts (if available)
       const pricedProducts = (localInvoiceData as any).pricedProducts;
       if (pricedProducts && pricedProducts.length > 0) {
         const mappedProducts = pricedProducts.map((pricedProduct: any) => {
-          const product = products.find((p: any) => p.id === pricedProduct.productId);
+          const product = products.find(
+            (p: any) => p.id === pricedProduct.productId,
+          );
           return {
             id: pricedProduct.productId,
             label: product?.productName || "",
@@ -301,7 +336,7 @@ export function LocalInvoiceForm({
 
         // Set product details for the multi-selector
         form.setValue("productDetails", mappedProducts);
-        
+
         // Set product prices for calculations
         setProductPrices(mappedProducts);
       }
@@ -311,11 +346,14 @@ export function LocalInvoiceForm({
   async function onSubmit(values: z.infer<typeof FormSchemaLocalInvoice>) {
     try {
       const isSuccess = localInvoiceData
-        ? (await updateLocalInvoice(localInvoiceData.id, { values, productPrices }),
+        ? (await updateLocalInvoice(localInvoiceData.id, {
+            values,
+            productPrices,
+          }),
           toast.success("Local invoice updated successfully"))
         : (await CreateLocalInvoice(
             { values, productPrices },
-            session.data?.user?.id || ""
+            session.data?.user?.id || "",
           ),
           toast.success("Local invoice created successfully"));
       if (isSuccess) {
@@ -343,20 +381,21 @@ export function LocalInvoiceForm({
   // }
 
   return (
-    <div>
+    <div className="p-2">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="lg:space-y-4 px-2 space-y-8"
+          className="relative text-left space-y-4 overflow-y-auto max-h-[calc(100vh-185px)] scrollbar-hide"
         >
-          <div className="lg:flex justify-center gap-5 w-full lg:space-y-0 space-y-8">
+          {/* <ScrollArea className=" overscroll-y-auto w-full space-y-4 lg:space-y-0"> */}
+          <div className="border-2 rounded-lg p-3 lg:flex gap-3 items-center justify-center space-y-4 lg:space-y-0">
             <FormField
               control={form.control}
               name="localInvoiceNo"
               render={({ field }) => (
-                <FormItem className="flex-1">
+                <FormItem>
                   <FormLabel>Invoice Number</FormLabel>
-                  <FormControl className="border-2 shadow">
+                  <FormControl>
                     <Input
                       disabled
                       className="uppercase"
@@ -368,71 +407,73 @@ export function LocalInvoiceForm({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="monthOf"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Select Month</FormLabel>
-                  <FormControl className="border-2 shadow">
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger id="month" className="border-2 shadow">
-                        <SelectValue placeholder="Month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="January">January</SelectItem>
-                        <SelectItem value="February">February</SelectItem>
-                        <SelectItem value="March">March</SelectItem>
-                        <SelectItem value="April">April</SelectItem>
-                        <SelectItem value="May">May</SelectItem>
-                        <SelectItem value="June">June</SelectItem>
-                        <SelectItem value="July">July</SelectItem>
-                        <SelectItem value="August">August</SelectItem>
-                        <SelectItem value="September">September</SelectItem>
-                        <SelectItem value="October">October</SelectItem>
-                        <SelectItem value="November">November</SelectItem>
-                        <SelectItem value="December">December</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="monthOf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Select Month</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <SelectTrigger id="month" className="w-full">
+                          <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="February">February</SelectItem>
+                          <SelectItem value="March">March</SelectItem>
+                          <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="May">May</SelectItem>
+                          <SelectItem value="June">June</SelectItem>
+                          <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="August">August</SelectItem>
+                          <SelectItem value="September">September</SelectItem>
+                          <SelectItem value="October">October</SelectItem>
+                          <SelectItem value="November">November</SelectItem>
+                          <SelectItem value="December">December</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="yearOf"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Select Year</FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger id="year" className="border-2 shadow">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <SelectItem
-                            key={i}
-                            value={`${new Date().getFullYear() - i}`}
-                          >
-                            {new Date().getFullYear() - i}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="yearOf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Select Year</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <SelectTrigger id="year" className="w-full">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <SelectItem
+                              key={i}
+                              value={`${new Date().getFullYear() - i}`}
+                            >
+                              {new Date().getFullYear() - i}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="localInvoiceDate"
@@ -446,7 +487,7 @@ export function LocalInvoiceForm({
                           variant={"outline"}
                           className={cn(
                             "pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
+                            !field.value && "text-muted-foreground",
                           )}
                         >
                           {field.value ? (
@@ -475,70 +516,70 @@ export function LocalInvoiceForm({
             />
           </div>
 
-          <FormField
-            control={form.control}
-            name="customerId"
-            render={({ field }) => (
-              <FormItem className="flex flex-col w-full">
-                <FormLabel>Customer</FormLabel>
-                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <FormControl className="border-2 shadow">
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className={cn(
-                          "w-full max-w-screen-2xl overflow-ellipsis overflow-clip justify-between",
-                          !field.value && "text-muted-foreground"
-                        )}
-                        onClick={() => setPopoverOpen(!popoverOpen)}
-                      >
-                        {currLocalCustomer
-                          ? `${currLocalCustomer?.customerName}`
-                          : "Select Customer"}
-                        <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Command className="max-w-screen-2xl">
-                      <CommandInput placeholder="Search Customer..." />
-                      <CommandList>
-                        <ScrollArea className="h-48 lg:h-[300px] w-80 lg:w-full rounded-md border pr-3">
-                          <CommandEmpty>No Customer found.</CommandEmpty>
-                          <CommandGroup>
-                            {customers?.map((customer) => (
-                              <CommandItem
-                                value={`${customer?.customerName} - ${customer?.address}`}
-                                key={customer.id}
-                                onSelect={() => {
-                                  form.setValue("customerId", customer.id);
-                                  setPopoverOpen(false);
-                                }}
-                              >
-                                <CheckIcon
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    customer.id === field.value
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {`${customer?.customerName} - ${customer?.address}`}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </ScrollArea>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="border-2 rounded-lg p-3 space-y-2">
+            <FormField
+              control={form.control}
+              name="customerId"
+              render={({ field }) => (
+                <FormItem className="flex flex-col w-full">
+                  <FormLabel>Customer</FormLabel>
+                  <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl className="border-2 shadow">
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full max-w-screen-2xl overflow-ellipsis overflow-clip justify-between",
+                            !field.value && "text-muted-foreground",
+                          )}
+                          onClick={() => setPopoverOpen(!popoverOpen)}
+                        >
+                          {currLocalCustomer
+                            ? `${currLocalCustomer?.customerName}`
+                            : "Select Customer"}
+                          <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Command className="max-w-screen-2xl">
+                        <CommandInput placeholder="Search Customer..." />
+                        <CommandList>
+                          <ScrollArea className="h-48 lg:h-[300px] w-80 lg:w-full rounded-md border pr-3">
+                            <CommandEmpty>No Customer found.</CommandEmpty>
+                            <CommandGroup>
+                              {customers?.map((customer) => (
+                                <CommandItem
+                                  value={`${customer?.customerName} - ${customer?.address}`}
+                                  key={customer.id}
+                                  onSelect={() => {
+                                    form.setValue("customerId", customer.id);
+                                    setPopoverOpen(false);
+                                  }}
+                                >
+                                  <CheckIcon
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      customer.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {`${customer?.customerName} - ${customer?.address}`}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </ScrollArea>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <div>
             <Label htmlFor="address">Address</Label>
             <Input
               className="border-2 shadow"
@@ -549,7 +590,7 @@ export function LocalInvoiceForm({
             />
           </div>
 
-          <div>
+          <div className="border-2 rounded-lg p-3 space-y-2">
             <FormField
               control={form.control}
               name="productDetails"
@@ -570,73 +611,82 @@ export function LocalInvoiceForm({
                 </FormItem>
               )}
             />
+
+            {productPrices.map((product) => {
+              return (
+                <div
+                  key={product.id}
+                  className="mt-3 lg:flex gap-5 lg:space-y-0 space-y-2"
+                >
+                  <div className="flex-1">
+                    <Label>Product Name</Label>
+                    <Input
+                      disabled
+                      value={product.productName || product.label || ""}
+                      placeholder="product"
+                    />
+                  </div>
+                  <div className="flex gap-5">
+                    <div className="flex-1">
+                      <Label>Qty</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={product.qty || ""}
+                        onChange={(e) =>
+                          handleProductInfoChange(
+                            "qty",
+                            e.target.value,
+                            product.id,
+                            product,
+                          )
+                        }
+                        placeholder="Quantity"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label>Rate</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={product.rate || ""}
+                        onChange={(e) =>
+                          handleProductInfoChange(
+                            "rate",
+                            e.target.value,
+                            product.id,
+                            product,
+                          )
+                        }
+                        placeholder="Rate"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="">
+                    <Label>Product Total Value</Label>
+                    <Input
+                      disabled
+                      value={product.productTotalValue || 0}
+                      placeholder="Product Total Value"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {productPrices.map((product) => {
-            return (
-              <div
-                key={product.id}
-                className="mt-3 lg:flex gap-5 lg:space-y-0 space-y-2"
-              >
-                <div className="flex-1">
-                  <Label>Product Name</Label>
-                  <Input
-                    disabled
-                    value={product.productName || product.label || ""}
-                    placeholder="product"
-                  />
-                </div>
-                <div className="flex gap-5">
-                  <div className="flex-1">
-                    <Label>Qty</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={product.qty || ""}
-                      onChange={(e) =>
-                        handleProductInfoChange(
-                          "qty",
-                          e.target.value,
-                          product.id,
-                          product
-                        )
-                      }
-                      placeholder="Quantity"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Rate</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={product.rate || ""}
-                      onChange={(e) =>
-                        handleProductInfoChange(
-                          "rate",
-                          e.target.value,
-                          product.id,
-                          product
-                        )
-                      }
-                      placeholder="Rate"
-                    />
-                  </div>
-                </div>
-
-                <div className="">
-                  <Label>Product Total Value</Label>
-                  <Input
-                    disabled
-                    value={product.productTotalValue || 0}
-                    placeholder="Product Total Value"
-                  />
-                </div>
-              </div>
-            );
-          })}
-
-          <FormField
+          <Alert className="border-gray-200 bg-gray-50 dark:border-stone-700 dark:bg-stone-800">
+            <AlertTitle className="text-lg font-semibold">
+              Total Invoice Value: {formatCurrencyForIndia(form.watch("localTotalInvoiceValue"))}
+            </AlertTitle>
+            <AlertDescription className="text-sm text-gray-600 dark:text-gray-400">
+              The total invoice value is the sum of the prices of all the products
+              in the invoice.
+            </AlertDescription>
+          </Alert>
+          {/* <FormField
             control={form.control}
             name="localTotalInvoiceValue"
             render={({ field }) => (
@@ -652,14 +702,22 @@ export function LocalInvoiceForm({
                 <FormMessage />
               </FormItem>
             )}
-          />
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full lg:w-auto"
+          /> */}
+          <StickyBar
+            position="bottom"
+            className="backdrop-blur-xs bottom-0 w-full justify-end border-neutral-200 lg:py-3 dark:border-neutral-800"
           >
-            {localInvoiceData ? "Update local invoice" : "Create local invoice"}
-          </Button>
+            <Button
+              type="submit"
+              isLoading={isSubmitting}
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {localInvoiceData
+                ? "Update Local Invoice"
+                : "Create Local Invoice"}
+            </Button>
+          </StickyBar>
         </form>
       </Form>
     </div>
