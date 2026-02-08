@@ -37,6 +37,9 @@ export async function GET(req: NextRequest) {
     }
 
     const browser = await puppeteer.launch({
+      // executablePath: process.env.NODE_ENV === "development" ? "/snap/bin/chromium" : undefined,
+      ...(process.env.NODE_ENV === 'production' ? { executablePath: "/snap/bin/chromium" } : {}),
+
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"], // Required for Heroku/Docker deployments
     });
