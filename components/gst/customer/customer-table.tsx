@@ -196,6 +196,19 @@ export const CustomerTable = () => {
         ),
       },
       {
+        id: "tags",
+        header: "Tags",
+        cell: ({ row }) => {
+          const r = row.original as FilteredCustomerData;
+          const t = r.tags ?? [];
+          return (
+            <div className="max-w-[200px] truncate text-sm" title={t.join(", ")}>
+              {t.length ? t.join(", ") : "—"}
+            </div>
+          );
+        },
+      },
+      {
         id: "actions",
         header: "Actions",
         enableHiding: false,

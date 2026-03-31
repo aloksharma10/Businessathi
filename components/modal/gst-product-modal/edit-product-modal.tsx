@@ -31,7 +31,14 @@ export const EditProductModal = () => {
             Update the product&apos;s information as needed.
           </DialogDescription>
         </DialogHeader>
-        <ProductForm productData={data.product} />
+        <ProductForm
+          key={
+            isOpenModel && data.product
+              ? `edit-product-${data.product.id}`
+              : "closed"
+          }
+          productData={data.product}
+        />
       </DialogContent>
     </Dialog>
   );

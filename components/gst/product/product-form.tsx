@@ -18,6 +18,7 @@ import { CreateProduct, UpdateProduct } from "@/action/product";
 import { useSession } from "next-auth/react";
 import { Product } from "@prisma/client";
 import { useEffect } from "react";
+import { TagsInput } from "@/components/tags-input";
 import { useModal } from "@/store/store";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ const FormSchemaProduct = z.object({
   }),
   cgstRate: z.string(),
   sgstRate: z.string(),
+  tags: z.array(z.string()),
 });
 
 export function ProductForm({ 
@@ -46,6 +48,7 @@ export function ProductForm({
       hsnCode: "",
       cgstRate: "",
       sgstRate: "",
+      tags: [],
     },
   });
 
@@ -56,34 +59,33 @@ export function ProductForm({
   const { onClose, triggerRefresh } = useModal();
 
   useEffect(() => {
-    if (productData) {
-      form.setValue("productName", productData.productName);
-      form.setValue("hsnCode", productData.hsnCode?.toString());
-      form.setValue("cgstRate", productData.cgstRate?.toString());
-      form.setValue("sgstRate", productData.sgstRate?.toString());
-    }
-  }, [productData, form]);
+    if (!productData) return;
+    form.reset({
+      productName: productData.productName,
+      hsnCode: productData.hsnCode?.toString() ?? "",
+      cgstRate: productData.cgstRate?.toString() ?? "",
+      sgstRate: productData.sgstRate?.toString() ?? "",
+      tags: productData.tags ?? [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid resetting tags while user edits
+  }, [productData?.id]);
 
   const session = useSession();
 
   async function onSubmit(data: z.infer<typeof FormSchemaProduct>) {
     try {
-      const isSuccess = productData
-        ? (await UpdateProduct(productData.id, data),
-          toast.success("Product updated successfully"))
-        : (await CreateProduct({ values: data }, session.data?.user?.id || ""),
-          toast.success("Product created successfully"));
-      if (isSuccess) {
-        form.reset();
-        onClose();
-        // Trigger refresh for product tables
-        triggerRefresh("gst-products");
-        triggerRefresh("local-products");
-        // Call onSuccess callback if provided
-        if (onSuccess) {
-          onSuccess();
-        }
+      if (productData) {
+        await UpdateProduct(productData.id, data);
+        toast.success("Product updated successfully");
+      } else {
+        await CreateProduct({ values: data }, session.data?.user?.id || "");
+        toast.success("Product created successfully");
       }
+      form.reset();
+      onClose();
+      triggerRefresh("gst-products");
+      triggerRefresh("local-products");
+      onSuccess?.();
     } catch (error) {
       productData
         ? toast.error("Failed to update product")
@@ -146,6 +148,24 @@ export function ProductForm({
                 <FormLabel>SGST Rate</FormLabel>
                 <FormControl>
                   <Input placeholder="SGST Rate" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="tags"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tags</FormLabel>
+                <FormControl>
+                  <TagsInput
+                    value={field.value ?? []}
+                    onChange={field.onChange}
+                    userId={session.data?.user?.id ?? ""}
+                    scope="product"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { normalizeTags } from "@/lib/tag-utils";
 
 export const CreateCustomer = async (values: any, userId: string) => {
   try {
@@ -12,6 +13,7 @@ export const CreateCustomer = async (values: any, userId: string) => {
         gstIn: values.values.gstIn.toUpperCase(),
         state: values.values.state,
         stateCode: Number(values.values.stateCode),
+        tags: normalizeTags(values.values.tags),
         // userId: userId,
         user: {
           connect: {
@@ -43,6 +45,9 @@ export const DeleteCustomer = async (id: string) => {
 
 export const UpdateCustomer = async (id: string, values: any) => {
   try {
+    const tagList = normalizeTags(
+      Array.isArray(values?.tags) ? values.tags : []
+    );
     const editCustomer = await prisma.customer.update({
       where: { id },
       data: {
@@ -51,13 +56,18 @@ export const UpdateCustomer = async (id: string, values: any) => {
         gstIn: values.gstIn?.toUpperCase(),
         state: values.state,
         stateCode: values.stateCode ? Number(values.stateCode) : undefined,
+        // MongoDB: replace scalar list explicitly so tags always persist
+        tags: { set: tagList },
       },
     });
 
     revalidatePath("/customers");
+    revalidatePath("/gst/customers");
+    revalidatePath("/customer-product-entries");
     return editCustomer;
   } catch (error) {
     console.error(error, "[UpdateCustomer]");
+    throw error;
   }
 };
 

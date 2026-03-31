@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ClipboardList,
   FileText,
   LayoutDashboardIcon,
   Package,
@@ -31,6 +32,11 @@ const navMain = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboardIcon,
+  },
+  {
+    title: "Customer & product entry",
+    url: "/customer-product-entries",
+    icon: ClipboardList,
   },
   {
     title: "Gst",

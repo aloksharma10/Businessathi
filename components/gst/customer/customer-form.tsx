@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { CreateCustomer, UpdateCustomer } from "@/action/customer";
 import { useEffect } from "react";
 import { Customer } from "@prisma/client";
+import { TagsInput } from "@/components/tags-input";
 import { useSession } from "next-auth/react";
 import { useModal } from "@/store/store";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ const FormSchemaCustomer = z.object({
   stateCode: z.string().min(1, {
     message: "State code must be at least 2 characters.",
   }),
+  tags: z.array(z.string()),
 });
 
 export function CustomerForm({ 
@@ -54,6 +56,7 @@ export function CustomerForm({
       gstIn: "",
       state: "",
       stateCode: "",
+      tags: [],
     },
   });
 
@@ -63,33 +66,33 @@ export function CustomerForm({
   const session = useSession();
 
   useEffect(() => {
-    if (customerData) {
-      form.setValue("customerName", customerData.customerName);
-      form.setValue("address", customerData.address);
-      form.setValue("gstIn", customerData.gstIn);
-      form.setValue("state", customerData.state);
-      form.setValue("stateCode", customerData.stateCode?.toString());
-    }
-  }, [customerData, form]);
+    if (!customerData) return;
+    form.reset({
+      customerName: customerData.customerName,
+      address: customerData.address,
+      gstIn: customerData.gstIn,
+      state: customerData.state,
+      stateCode: customerData.stateCode?.toString() ?? "",
+      tags: customerData.tags ?? [],
+    });
+    // Only re-sync when switching to another customer (modal remounts per open via key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid resetting tags while user edits
+  }, [customerData?.id]);
 
   async function onSubmit(data: z.infer<typeof FormSchemaCustomer>) {
     try {
-      const isSuccess = customerData
-        ? (await UpdateCustomer(customerData.id, data),
-          toast.success("Customer updated successfully"))
-        : (await CreateCustomer({ values: data }, session.data?.user?.id || ""),
-          toast.success("Customer created successfully"));
-      if (isSuccess) {
-        form.reset();
-        onClose();
-        // Trigger refresh for customer tables
-        triggerRefresh("gst-customers");
-        triggerRefresh("local-customers");
-        // Call onSuccess callback if provided
-        if (onSuccess) {
-          onSuccess();
-        }
+      if (customerData) {
+        await UpdateCustomer(customerData.id, data);
+        toast.success("Customer updated successfully");
+      } else {
+        await CreateCustomer({ values: data }, session.data?.user?.id || "");
+        toast.success("Customer created successfully");
       }
+      form.reset();
+      onClose();
+      triggerRefresh("gst-customers");
+      triggerRefresh("local-customers");
+      onSuccess?.();
     } catch (error) {
       customerData
         ? toast.error("Failed to update customer")
@@ -168,6 +171,24 @@ export function CustomerForm({
               <FormLabel>State Code</FormLabel>
               <FormControl>
                 <Input placeholder="State Code" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="tags"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tags</FormLabel>
+              <FormControl>
+                <TagsInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  userId={session.data?.user?.id ?? ""}
+                  scope="customer"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

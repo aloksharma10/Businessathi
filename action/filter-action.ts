@@ -124,6 +124,7 @@ export interface FilteredCustomerData {
   gstIn: string;
   state: string;
   stateCode: number;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -155,6 +156,7 @@ export interface FilteredProductData {
   hsnCode: number;
   cgstRate: number;
   sgstRate: number;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -996,6 +998,9 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
               mode: "insensitive" as const,
             },
           },
+          {
+            tags: { has: globalSearch.trim().toUpperCase() },
+          },
         ];
       } else {
         (whereConditions as Prisma.LocalCustomerWhereInput).OR = [
@@ -1062,6 +1067,7 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
           gstIn: gstCustomer.gstIn,
           state: gstCustomer.state,
           stateCode: gstCustomer.stateCode,
+          tags: gstCustomer.tags ?? [],
           createdAt: gstCustomer.createdAt,
           updatedAt: gstCustomer.updatedAt,
         } as FilteredCustomerData;
@@ -1129,6 +1135,9 @@ export const filterProducts = async (params: ProductFilterParams) => {
                 : Number(globalSearch),
             },
           },
+          {
+            tags: { has: globalSearch.trim().toUpperCase() },
+          },
         ];
       } else {
         (whereConditions as Prisma.LocalProductWhereInput).OR = [
@@ -1188,6 +1197,7 @@ export const filterProducts = async (params: ProductFilterParams) => {
           hsnCode: gstProduct.hsnCode,
           cgstRate: gstProduct.cgstRate,
           sgstRate: gstProduct.sgstRate,
+          tags: gstProduct.tags ?? [],
           createdAt: gstProduct.createdAt,
           updatedAt: gstProduct.updatedAt,
         } as FilteredProductData;
@@ -1239,6 +1249,7 @@ export const exportCustomersToXLSX = async (params: CustomerFilterParams) => {
           "GST Number": gstCustomer.gstIn,
           State: gstCustomer.state,
           "State Code": gstCustomer.stateCode,
+          Tags: (gstCustomer.tags ?? []).join(", "),
           "Created Date": format(gstCustomer.createdAt, "dd/MM/yyyy"),
         };
       } else {
@@ -1264,6 +1275,7 @@ export const exportCustomersToXLSX = async (params: CustomerFilterParams) => {
             { wch: 20 }, // GST Number
             { wch: 15 }, // State
             { wch: 12 }, // State Code
+            { wch: 24 }, // Tags
           ]
         : []),
       { wch: 15 }, // Created Date
@@ -1311,7 +1323,7 @@ export const exportCustomersToCSV = async (params: CustomerFilterParams) => {
       "Customer Name",
       "Address",
       ...(params.customerType === "gst"
-        ? ["GST Number", "State", "State Code"]
+        ? ["GST Number", "State", "State Code", "Tags"]
         : []),
       "Created Date",
     ];
@@ -1326,6 +1338,7 @@ export const exportCustomersToCSV = async (params: CustomerFilterParams) => {
           gstCustomer.gstIn,
           gstCustomer.state,
           gstCustomer.stateCode,
+          (gstCustomer.tags ?? []).join(", "),
           format(gstCustomer.createdAt, "dd/MM/yyyy"),
         ];
       } else {
@@ -1383,6 +1396,7 @@ export const exportProductsToXLSX = async (params: ProductFilterParams) => {
           "CGST Rate": gstProduct.cgstRate,
           "SGST Rate": gstProduct.sgstRate,
           "Total GST Rate": gstProduct.cgstRate + gstProduct.sgstRate,
+          Tags: (gstProduct.tags ?? []).join(", "),
           "Created Date": format(gstProduct.createdAt, "dd/MM/yyyy"),
         };
       } else {
@@ -1407,6 +1421,7 @@ export const exportProductsToXLSX = async (params: ProductFilterParams) => {
             { wch: 12 }, // CGST Rate
             { wch: 12 }, // SGST Rate
             { wch: 15 }, // Total GST Rate
+            { wch: 24 }, // Tags
           ]
         : []),
       { wch: 15 }, // Created Date
@@ -1458,6 +1473,7 @@ export const exportProductsToCSV = async (params: ProductFilterParams) => {
             "CGST Rate",
             "SGST Rate",
             "Total GST Rate",
+            "Tags",
             "Created Date",
           ]
         : ["Product Name", "Created Date"];
@@ -1472,6 +1488,7 @@ export const exportProductsToCSV = async (params: ProductFilterParams) => {
           gstProduct.cgstRate,
           gstProduct.sgstRate,
           gstProduct.cgstRate + gstProduct.sgstRate,
+          (gstProduct.tags ?? []).join(", "),
           format(gstProduct.createdAt, "dd/MM/yyyy"),
         ];
       } else {
