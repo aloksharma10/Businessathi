@@ -77,11 +77,13 @@ export const CreateLocalCustomer = async (values: any, userId: string) => {
       data: {
         customerName: values.values.customerName.toUpperCase(),
         address: values.values.address.toUpperCase(),
+        tags: normalizeTags(values.values.tags),
         userId: userId,
       },
     });
     revalidatePath("/");
     revalidatePath("/local/customers");
+    revalidatePath("/customer-product-entries");
     return newLocalCustomer;
   } catch (error) {
     console.error(error, "[CreateLocalCustomer]");
@@ -90,6 +92,9 @@ export const CreateLocalCustomer = async (values: any, userId: string) => {
 
 export const UpdateLocalCustomer = async (id: string, values: any) => {
   try {
+    const tagList = normalizeTags(
+      Array.isArray(values?.tags) ? values.tags : []
+    );
     const editLocalCustomer = await prisma.localCustomer.update({
       where: {
         id,
@@ -97,13 +102,17 @@ export const UpdateLocalCustomer = async (id: string, values: any) => {
       data: {
         customerName: values.customerName?.toUpperCase(),
         address: values.address?.toUpperCase(),
+        tags: { set: tagList },
       },
     });
     revalidatePath("/");
     revalidatePath("/customers");
+    revalidatePath("/local/customers");
+    revalidatePath("/customer-product-entries");
     return editLocalCustomer;
   } catch (error) {
     console.error(error, "[UpdateLocalCustomer]");
+    throw error;
   }
 };
 

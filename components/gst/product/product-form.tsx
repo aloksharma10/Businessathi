@@ -96,7 +96,26 @@ export function ProductForm({
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          className="space-y-6"
+          onSubmitCapture={() => {
+            const el = document.activeElement;
+            if (el instanceof HTMLInputElement) {
+              const typ = (el.type || "").toLowerCase();
+              if (
+                typ !== "submit" &&
+                typ !== "button" &&
+                typ !== "checkbox" &&
+                typ !== "radio" &&
+                typ !== "file" &&
+                typ !== "hidden"
+              ) {
+                el.blur();
+              }
+            }
+          }}
+          onSubmit={form.handleSubmit(onSubmit)}
+        >
           <FormField
             control={form.control}
             name="productName"
@@ -163,6 +182,7 @@ export function ProductForm({
                   <TagsInput
                     value={field.value ?? []}
                     onChange={field.onChange}
+                    onBlur={field.onBlur}
                     userId={session.data?.user?.id ?? ""}
                     scope="product"
                   />

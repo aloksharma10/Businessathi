@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { TagBadge } from "@/components/ui/tag-badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { getDistinctTagsForScope } from "@/action/tag-suggestions";
+import {
+  getAllDistinctTags,
+  getDistinctTagsForScope,
+  type TagScope,
+} from "@/action/tag-suggestions";
 
 function normalizeOne(raw: string): string {
   return raw.trim().toUpperCase();
@@ -15,20 +19,26 @@ export function TagsInput({
   value,
   onChange,
   userId,
+  suggestionPool = "scope",
   scope,
   placeholder = "Type and press Enter or pick a suggestion…",
   disabled,
   className,
   id,
+  onBlur: onBlurProp,
 }: {
   value: string[];
   onChange: (tags: string[]) => void;
   userId: string;
-  scope: "customer" | "product";
+  /** When "all", suggestions include every tag used on any customer/product type. */
+  suggestionPool?: "scope" | "all";
+  scope: TagScope;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
   id?: string;
+  /** Called after pending input is committed (e.g. pass `field.onBlur` from react-hook-form). */
+  onBlur?: () => void;
 }) {
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
@@ -38,13 +48,17 @@ export function TagsInput({
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    getDistinctTagsForScope(userId, scope).then((tags) => {
+    const load =
+      suggestionPool === "all"
+        ? getAllDistinctTags(userId)
+        : getDistinctTagsForScope(userId, scope);
+    load.then((tags) => {
       if (!cancelled) setPool(tags);
     });
     return () => {
       cancelled = true;
     };
-  }, [userId, scope]);
+  }, [userId, scope, suggestionPool]);
 
   const selectedSet = useMemo(() => new Set(value), [value]);
 
@@ -116,22 +130,23 @@ export function TagsInput({
     <div ref={wrapRef} className={cn("space-y-2", className)}>
       <div className="flex flex-wrap gap-1.5 min-h-[28px]">
         {value.map((tag) => (
-          <Badge
+          <TagBadge
             key={tag}
-            variant="secondary"
+            tag={tag}
+            mode="pill"
             className="gap-1 pr-1 font-normal"
           >
             {tag}
             <button
               type="button"
-              className="rounded-sm hover:bg-muted p-0.5"
+              className="rounded-sm hover:bg-black/10 dark:hover:bg-white/15 p-0.5"
               onClick={() => removeTag(tag)}
               disabled={disabled}
               aria-label={`Remove ${tag}`}
             >
               <X className="h-3 w-3" />
             </button>
-          </Badge>
+          </TagBadge>
         ))}
       </div>
       <div className="relative">
@@ -157,6 +172,12 @@ export function TagsInput({
             if (e.key === "Backspace" && !input && value.length) {
               removeTag(value[value.length - 1]);
             }
+          }}
+          onBlur={() => {
+            // Commit typed text so "new" tags are in the form value before submit
+            // (otherwise only Enter/comma adds them.)
+            commitInput();
+            onBlurProp?.();
           }}
           className="uppercase"
         />

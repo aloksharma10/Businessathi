@@ -19,15 +19,17 @@ import { Input } from "@/components/ui/input";
 import { useModal } from "@/store/store";
 import { LocalProduct } from "@prisma/client";
 import { useEffect } from "react";
+import { TagsInput } from "@/components/tags-input";
 
 const FormSchemaLocalProduct = z.object({
   productName: z.string().min(2, {
     message: "Product name must be at least 2 characters.",
   }),
+  tags: z.array(z.string()),
 });
 
 export const LocalProductForm = ({
-  localProductData
+  localProductData,
 }: {
   localProductData?: LocalProduct;
 }) => {
@@ -38,40 +40,66 @@ export const LocalProductForm = ({
     resolver: zodResolver(FormSchemaLocalProduct),
     defaultValues: {
       productName: "",
+      tags: [],
     },
   });
 
   useEffect(() => {
-    if (localProductData) {
-      form.setValue("productName", localProductData.productName);
-    }
-  }, [localProductData, form]);
+    if (!localProductData) return;
+    form.reset({
+      productName: localProductData.productName,
+      tags: localProductData.tags ?? [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localProductData?.id]);
 
   async function onSubmit(data: z.infer<typeof FormSchemaLocalProduct>) {
     try {
-      const isSuccess = localProductData
-        ? (await UpdateLocalProduct(localProductData.id, data),
-          toast.success("Local product updated successfully."))
-        : (await CreateLocalProduct(
+      if (localProductData) {
+        await UpdateLocalProduct(localProductData.id, data);
+        toast.success("Local product updated successfully.");
+      } else {
+        await CreateLocalProduct(
           { values: data },
           session.data?.user?.id || ""
-        ),
-          toast.success("Local product created successfully."));
-      if (isSuccess) {
-        form.reset();
-        onClose();
-        // Trigger refresh for product tables
-        triggerRefresh("gst-products");
-        triggerRefresh("local-products");
+        );
+        toast.success("Local product created successfully.");
       }
+      form.reset();
+      onClose();
+      triggerRefresh("gst-products");
+      triggerRefresh("local-products");
     } catch (error) {
-      toast.error("Failed to create local Product.");
+      toast.error(
+        localProductData
+          ? "Failed to update local product."
+          : "Failed to create local product."
+      );
     }
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        className="space-y-6"
+        onSubmitCapture={() => {
+          const el = document.activeElement;
+          if (el instanceof HTMLInputElement) {
+            const typ = (el.type || "").toLowerCase();
+            if (
+              typ !== "submit" &&
+              typ !== "button" &&
+              typ !== "checkbox" &&
+              typ !== "radio" &&
+              typ !== "file" &&
+              typ !== "hidden"
+            ) {
+              el.blur();
+            }
+          }
+        }}
+        onSubmit={form.handleSubmit(onSubmit)}
+      >
         <FormField
           control={form.control}
           name="productName"
@@ -79,15 +107,38 @@ export const LocalProductForm = ({
             <FormItem>
               <FormLabel>Product Name</FormLabel>
               <FormControl>
-                <Input className="uppercase" placeholder="Product Name" {...field} />
+                <Input
+                  className="uppercase"
+                  placeholder="Product Name"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit">{localProductData
-          ? "Update Local Product"
-          : "Create Local Product"}</Button>
+        <FormField
+          control={form.control}
+          name="tags"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tags</FormLabel>
+              <FormControl>
+                <TagsInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  userId={session.data?.user?.id ?? ""}
+                  scope="localProduct"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">
+          {localProductData ? "Update Local Product" : "Create Local Product"}
+        </Button>
       </form>
     </Form>
   );

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboardIcon,
+  ListChecks,
   Package,
   Plus,
   ReceiptTextIcon,
@@ -34,9 +35,14 @@ const navMain = [
     icon: LayoutDashboardIcon,
   },
   {
-    title: "Customer & product entry",
+    title: "Data Entry",
     url: "/customer-product-entries",
     icon: ClipboardList,
+  },
+  {
+    title: "Saved entries",
+    url: "/customer-product-entries/saved",
+    icon: ListChecks,
   },
   {
     title: "Gst",

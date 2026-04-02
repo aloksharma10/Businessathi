@@ -6,7 +6,7 @@ import { endOfDay, format, startOfDay } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 
-export type EntryKind = "gst" | "local";
+export type EntryKind = "gst" | "local" | "plant";
 export type ProductLineInput = { productId: string; qty: number };
 
 function mergeProductLines(lines: ProductLineInput[]): ProductLineInput[] {
@@ -42,8 +42,10 @@ function parseEntryLines(entry: {
 function rowKind(e: {
   kind: string | null;
   localCustomerId: string | null;
+  plantCustomerId: string | null;
 }): EntryKind {
   if (e.kind === "local" || e.localCustomerId) return "local";
+  if (e.kind === "plant" || e.plantCustomerId) return "plant";
   return "gst";
 }
 
@@ -59,11 +61,17 @@ export async function getLinesFromLastCustomerProductEntry(
           userId,
           customerId,
         }
-      : {
-          userId,
-          kind: "local",
-          localCustomerId: customerId,
-        };
+      : kind === "local"
+        ? {
+            userId,
+            kind: "local",
+            localCustomerId: customerId,
+          }
+        : {
+            userId,
+            kind: "plant",
+            plantCustomerId: customerId,
+          };
 
   const lastEntry = await prisma.customerProductEntry.findFirst({
     where,
@@ -115,13 +123,14 @@ export async function createCustomerProductEntry(
         kind: "gst",
         customerId: params.customerId,
         localCustomerId: null,
+        plantCustomerId: null,
         productIds: uniqueIds,
         productLines: lines as unknown as Prisma.InputJsonValue,
         entryDate: params.entryDate,
         notes: params.notes?.trim() || null,
       },
     });
-  } else {
+  } else if (params.kind === "local") {
     const customer = await prisma.localCustomer.findFirst({
       where: { id: params.customerId, userId },
     });
@@ -141,15 +150,46 @@ export async function createCustomerProductEntry(
         kind: "local",
         customerId: null,
         localCustomerId: params.customerId,
+        plantCustomerId: null,
         productIds: uniqueIds,
         productLines: lines as unknown as Prisma.InputJsonValue,
         entryDate: params.entryDate,
         notes: params.notes?.trim() || null,
       },
     });
+  } else if (params.kind === "plant") {
+    const customer = await prisma.plantCustomer.findFirst({
+      where: { id: params.customerId, userId },
+    });
+    if (!customer) {
+      throw new Error("Customer not found.");
+    }
+    const products = await prisma.plantProduct.findMany({
+      where: { userId, id: { in: uniqueIds } },
+      select: { id: true },
+    });
+    if (products.length !== uniqueIds.length) {
+      throw new Error("One or more products are invalid.");
+    }
+    await prisma.customerProductEntry.create({
+      data: {
+        userId,
+        kind: "plant",
+        customerId: null,
+        localCustomerId: null,
+        plantCustomerId: params.customerId,
+        productIds: uniqueIds,
+        productLines: lines as unknown as Prisma.InputJsonValue,
+        entryDate: params.entryDate,
+        notes: params.notes?.trim() || null,
+      },
+    });
+  } else {
+    throw new Error("Invalid entry kind.");
   }
 
   revalidatePath("/customer-product-entries");
+  revalidatePath("/customer-product-entries/saved");
   revalidatePath("/gst/customer-product-entries");
 }
 
@@ -160,6 +200,8 @@ export interface ListCustomerProductEntriesParams {
   dateTo?: Date;
   page?: number;
   pageSize?: number;
+  /** Match entries where customer or any line product has at least one of these tags. */
+  tagFilter?: string[];
 }
 
 export type CustomerProductEntryListRow = {
@@ -173,23 +215,12 @@ export type CustomerProductEntryListRow = {
   productNames: string;
 };
 
-export async function listCustomerProductEntries(
-  params: ListCustomerProductEntriesParams
-): Promise<{
-  rows: CustomerProductEntryListRow[];
-  totalCount: number;
-  pageCount: number;
-  currentPage: number;
-}> {
-  const {
-    userId,
-    customerId,
-    dateFrom,
-    dateTo,
-    page = 1,
-    pageSize = 15,
-  } = params;
-
+function buildEntryWhere(
+  userId: string,
+  customerId: string | undefined,
+  dateFrom: Date | undefined,
+  dateTo: Date | undefined
+): Prisma.CustomerProductEntryWhereInput {
   const dateRange =
     dateFrom || dateTo
       ? {
@@ -198,11 +229,15 @@ export async function listCustomerProductEntries(
         }
       : null;
 
-  const where: Prisma.CustomerProductEntryWhereInput = {
+  return {
     userId,
     ...(customerId
       ? {
-          OR: [{ customerId }, { localCustomerId: customerId }],
+          OR: [
+            { customerId },
+            { localCustomerId: customerId },
+            { plantCustomerId: customerId },
+          ],
         }
       : {}),
     ...(dateRange
@@ -234,46 +269,108 @@ export async function listCustomerProductEntries(
         }
       : {}),
   };
+}
 
-  const skip = (page - 1) * pageSize;
+function tagSetFromFilter(tags?: string[]): Set<string> | null {
+  if (!tags?.length) return null;
+  const s = new Set<string>();
+  for (const t of tags) {
+    const n = String(t).trim().toUpperCase();
+    if (n) s.add(n);
+  }
+  return s.size ? s : null;
+}
 
-  const [entries, totalCount] = await Promise.all([
-    prisma.customerProductEntry.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: pageSize,
-      include: {
-        customer: { select: { id: true, customerName: true } },
-        localCustomer: { select: { id: true, customerName: true } },
-      },
-    }),
-    prisma.customerProductEntry.count({ where }),
-  ]);
+function tagsMatch(tags: string[] | undefined | null, filter: Set<string>): boolean {
+  if (!tags?.length) return false;
+  for (const t of tags) {
+    const n = String(t).trim().toUpperCase();
+    if (n && filter.has(n)) return true;
+  }
+  return false;
+}
 
+type EntryWithRelations = {
+  id: string;
+  createdAt: Date;
+  entryDate: Date | null;
+  notes: string | null;
+  kind: string | null;
+  customerId: string | null;
+  localCustomerId: string | null;
+  plantCustomerId: string | null;
+  productIds: string[];
+  productLines: Prisma.JsonValue | null;
+  customer: {
+    id: string;
+    customerName: string;
+    tags?: string[];
+  } | null;
+  localCustomer: {
+    id: string;
+    customerName: string;
+    tags?: string[];
+  } | null;
+  plantCustomer: {
+    id: string;
+    customerName: string;
+    tags?: string[];
+  } | null;
+};
+
+type RowWithTagCtx = CustomerProductEntryListRow & {
+  _tagCtx?: {
+    customerTags: string[];
+    lineProductTags: string[][];
+  };
+};
+
+async function mapEntriesToRows(
+  entries: EntryWithRelations[],
+  userId: string,
+  withProductTags: boolean
+): Promise<RowWithTagCtx[]> {
   const gstProductIds = new Set<string>();
   const localProductIds = new Set<string>();
+  const plantProductIds = new Set<string>();
   for (const e of entries) {
     const lines = parseEntryLines(e);
     const k = rowKind(e);
     for (const l of lines) {
       if (k === "local") localProductIds.add(l.productId);
+      else if (k === "plant") plantProductIds.add(l.productId);
       else gstProductIds.add(l.productId);
     }
   }
 
-  const [gstProducts, localProducts] = await Promise.all([
+  const gstSel = withProductTags
+    ? ({ id: true, productName: true, tags: true } as const)
+    : ({ id: true, productName: true } as const);
+  const localSel = withProductTags
+    ? ({ id: true, productName: true, tags: true } as const)
+    : ({ id: true, productName: true } as const);
+  const plantSel = withProductTags
+    ? ({ id: true, productName: true, tags: true } as const)
+    : ({ id: true, productName: true } as const);
+
+  const [gstProducts, localProducts, plantProducts] = await Promise.all([
     gstProductIds.size === 0
       ? []
       : prisma.product.findMany({
           where: { userId, id: { in: [...gstProductIds] } },
-          select: { id: true, productName: true },
+          select: gstSel,
         }),
     localProductIds.size === 0
       ? []
       : prisma.localProduct.findMany({
           where: { userId, id: { in: [...localProductIds] } },
-          select: { id: true, productName: true },
+          select: localSel,
+        }),
+    plantProductIds.size === 0
+      ? []
+      : prisma.plantProduct.findMany({
+          where: { userId, id: { in: [...plantProductIds] } },
+          select: plantSel,
         }),
   ]);
 
@@ -283,11 +380,35 @@ export async function listCustomerProductEntries(
   const localNameById = Object.fromEntries(
     localProducts.map((p) => [p.id, p.productName])
   );
+  const plantNameById = Object.fromEntries(
+    plantProducts.map((p) => [p.id, p.productName])
+  );
 
-  const rows: CustomerProductEntryListRow[] = entries.map((e) => {
+  const gstTagById = withProductTags
+    ? Object.fromEntries(
+        gstProducts.map((p) => [p.id, (p as { tags?: string[] }).tags ?? []])
+      )
+    : null;
+  const localTagById = withProductTags
+    ? Object.fromEntries(
+        localProducts.map((p) => [p.id, (p as { tags?: string[] }).tags ?? []])
+      )
+    : null;
+  const plantTagById = withProductTags
+    ? Object.fromEntries(
+        plantProducts.map((p) => [p.id, (p as { tags?: string[] }).tags ?? []])
+      )
+    : null;
+
+  return entries.map((e) => {
     const k = rowKind(e);
     const lines = parseEntryLines(e);
-    const nameById = k === "local" ? localNameById : gstNameById;
+    const nameById =
+      k === "local"
+        ? localNameById
+        : k === "plant"
+          ? plantNameById
+          : gstNameById;
     const productNames = lines
       .map((l) => {
         const name = nameById[l.productId] ?? l.productId;
@@ -297,9 +418,11 @@ export async function listCustomerProductEntries(
     const customerName =
       k === "local"
         ? e.localCustomer?.customerName ?? "—"
-        : e.customer?.customerName ?? "—";
+        : k === "plant"
+          ? e.plantCustomer?.customerName ?? "—"
+          : e.customer?.customerName ?? "—";
 
-    return {
+    const base: RowWithTagCtx = {
       id: e.id,
       kind: k,
       createdAt: e.createdAt,
@@ -309,7 +432,115 @@ export async function listCustomerProductEntries(
       productLines: lines,
       productNames,
     };
+    if (withProductTags) {
+      base._tagCtx = {
+        customerTags:
+          k === "gst"
+            ? e.customer?.tags ?? []
+            : k === "local"
+              ? e.localCustomer?.tags ?? []
+              : e.plantCustomer?.tags ?? [],
+        lineProductTags: lines.map((l) =>
+          k === "gst"
+            ? gstTagById?.[l.productId] ?? []
+            : k === "local"
+              ? localTagById?.[l.productId] ?? []
+              : plantTagById?.[l.productId] ?? []
+        ),
+      };
+    }
+    return base;
   });
+}
+
+function filterRowsByTags(
+  rows: RowWithTagCtx[],
+  filter: Set<string>
+): CustomerProductEntryListRow[] {
+  return rows
+    .filter((r) => {
+      const ctx = r._tagCtx;
+      if (!ctx) return true;
+      if (tagsMatch(ctx.customerTags, filter)) return true;
+      for (const pt of ctx.lineProductTags) {
+        if (tagsMatch(pt, filter)) return true;
+      }
+      return false;
+    })
+    .map(({ _tagCtx: _, ...rest }) => rest);
+}
+
+export async function listCustomerProductEntries(
+  params: ListCustomerProductEntriesParams
+): Promise<{
+  rows: CustomerProductEntryListRow[];
+  totalCount: number;
+  pageCount: number;
+  currentPage: number;
+}> {
+  const {
+    userId,
+    customerId,
+    dateFrom,
+    dateTo,
+    page = 1,
+    pageSize = 15,
+    tagFilter,
+  } = params;
+
+  const where = buildEntryWhere(userId, customerId, dateFrom, dateTo);
+  const tagSet = tagSetFromFilter(tagFilter);
+  const skip = (page - 1) * pageSize;
+
+  const includeWithTags = {
+    customer: { select: { id: true, customerName: true, tags: true } },
+    localCustomer: { select: { id: true, customerName: true, tags: true } },
+    plantCustomer: { select: { id: true, customerName: true, tags: true } },
+  };
+  const includeMinimal = {
+    customer: { select: { id: true, customerName: true } },
+    localCustomer: { select: { id: true, customerName: true } },
+    plantCustomer: { select: { id: true, customerName: true } },
+  };
+
+  if (tagSet) {
+    const allEntries = await prisma.customerProductEntry.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: includeWithTags,
+    });
+    const mapped = await mapEntriesToRows(
+      allEntries as EntryWithRelations[],
+      userId,
+      true
+    );
+    const filtered = filterRowsByTags(mapped, tagSet);
+    const totalCount = filtered.length;
+    const rows = filtered.slice(skip, skip + pageSize);
+    return {
+      rows,
+      totalCount,
+      pageCount: Math.ceil(totalCount / pageSize) || 1,
+      currentPage: page,
+    };
+  }
+
+  const [entries, totalCount] = await Promise.all([
+    prisma.customerProductEntry.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      include: includeMinimal,
+    }),
+    prisma.customerProductEntry.count({ where }),
+  ]);
+
+  const rows = await mapEntriesToRows(
+    entries as EntryWithRelations[],
+    userId,
+    false
+  );
 
   return {
     rows,
@@ -324,6 +555,7 @@ export interface CustomerProductEntryExportParams {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  tagFilter?: string[];
 }
 
 export async function exportCustomerProductEntriesToXLSX(
@@ -339,6 +571,7 @@ export async function exportCustomerProductEntriesToXLSX(
     customerId: params.customerId,
     dateFrom,
     dateTo,
+    tagFilter: params.tagFilter,
     page: 1,
     pageSize: 100000,
   });
@@ -348,7 +581,6 @@ export async function exportCustomerProductEntriesToXLSX(
   }
 
   const exportData = rows.map((r) => ({
-    Type: r.kind === "gst" ? "GST" : "General",
     "Entry Date": format(r.entryDate ?? r.createdAt, "dd/MM/yyyy HH:mm"),
     "Customer Name": r.customerName,
     Products: r.productNames,
@@ -358,7 +590,6 @@ export async function exportCustomerProductEntriesToXLSX(
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   worksheet["!cols"] = [
-    { wch: 10 },
     { wch: 20 },
     { wch: 28 },
     { wch: 50 },

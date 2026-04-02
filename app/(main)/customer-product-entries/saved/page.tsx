@@ -1,15 +1,15 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { CustomerProductEntriesView } from "@/components/customer-product-entry/customer-product-entries-view";
+import { SavedCustomerProductEntries } from "@/components/customer-product-entry/saved-customer-product-entries";
 
-export default async function CustomerProductEntriesPage() {
+export default async function SavedCustomerProductEntriesPage() {
   const session = await auth();
   const userId = session?.user?.id;
 
   if (!userId) {
     return (
       <p className="text-muted-foreground text-sm">
-        Sign in to record customer and product entries.
+        Sign in to view saved customer and product entries.
       </p>
     );
   }
@@ -49,7 +49,7 @@ export default async function CustomerProductEntriesPage() {
   ]);
 
   return (
-    <CustomerProductEntriesView
+    <SavedCustomerProductEntries
       gstCustomers={gstCustomers}
       localCustomers={localCustomers}
       gstProducts={gstProducts}

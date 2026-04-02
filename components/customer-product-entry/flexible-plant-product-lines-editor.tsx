@@ -2,20 +2,19 @@
 
 import { useMemo, useState } from "react";
 import type { ChangeEvent, FocusEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckIcon,
   ChevronsUpDownIcon,
+  Loader2,
   Minus,
   Plus,
   Trash2,
 } from "lucide-react";
+import { PlantProduct } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Command,
   CommandEmpty,
@@ -24,24 +23,37 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { ensurePlantProduct } from "@/action/plant-entities";
+import type { ProductLineValue } from "@/components/customer-product-entry/product-lines-editor";
 
-export type ProductLinePick = { id: string; productName: string };
-export type ProductLineValue = { productId: string; qty: number };
+function norm(s: string) {
+  return s.trim().replace(/\s+/g, " ").toUpperCase();
+}
 
-export function ProductLinesEditor({
+export function FlexiblePlantProductLinesEditor({
+  userId,
   products,
   value,
   onChange,
   disabled,
 }: {
-  products: ProductLinePick[];
+  userId: string;
+  products: PlantProduct[];
   value: ProductLineValue[];
   onChange: (v: ProductLineValue[]) => void;
   disabled?: boolean;
 }) {
+  const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pending, setPending] = useState(false);
+  /** Raw qty while typing (allows empty / partial digits before blur). */
   const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
 
   const nameById = useMemo(
@@ -49,11 +61,21 @@ export function ProductLinesEditor({
     [products]
   );
 
-  const selected = useMemo(() => new Set(value.map((v) => v.productId)), [value]);
+  const selected = useMemo(
+    () => new Set(value.map((v) => v.productId)),
+    [value]
+  );
 
-  const available = useMemo(
-    () => products.filter((p) => !selected.has(p.id)),
-    [products, selected]
+  const q = norm(search);
+  const filteredPick = useMemo(() => {
+    const avail = products.filter((p) => !selected.has(p.id));
+    if (!q) return avail;
+    return avail.filter((p) => norm(p.productName).includes(q));
+  }, [products, selected, q]);
+
+  const exactMatch = useMemo(
+    () => products.some((p) => norm(p.productName) === q),
+    [products, q]
   );
 
   const setLineQty = (productId: string, qty: number) => {
@@ -82,21 +104,7 @@ export function ProductLinesEditor({
     setLineQty(productId, Math.max(1, base + delta));
   };
 
-  const removeLine = (productId: string) => {
-    setQtyDraft((prev) => {
-      const copy = { ...prev };
-      delete copy[productId];
-      return copy;
-    });
-    onChange(value.filter((l) => l.productId !== productId));
-  };
-
-  const addProduct = (productId: string) => {
-    if (selected.has(productId)) return;
-    onChange([...value, { productId, qty: 1 }]);
-    setAddOpen(false);
-  };
-
+  /** Only update local draft while typing — avoids RHF re-renders fighting the input. */
   const onQtyChange = (productId: string, e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, "");
     setQtyDraft((prev) => ({ ...prev, [productId]: raw }));
@@ -122,12 +130,36 @@ export function ProductLinesEditor({
     commitQtyDraft(productId, raw);
   };
 
+  const removeLine = (productId: string) => {
+    onChange(value.filter((l) => l.productId !== productId));
+  };
+
+  const addProduct = (productId: string) => {
+    if (selected.has(productId)) return;
+    onChange([...value, { productId, qty: 1 }]);
+    setAddOpen(false);
+    setSearch("");
+  };
+
+  const handleCreateProduct = async () => {
+    if (!search.trim() || !userId) return;
+    setPending(true);
+    try {
+      const { id } = await ensurePlantProduct(userId, search);
+      router.refresh();
+      addProduct(id);
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {value.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Add products below. When you pick a customer, lines default to their
-          last saved entry here with quantities.
+          Add products below. When you pick a plant customer, lines default to
+          their last saved entry here with quantities. Type a new product name
+          to create it automatically.
         </p>
       )}
 
@@ -206,44 +238,87 @@ export function ProductLinesEditor({
         );
       })}
 
-      {available.length > 0 && (
-        <Popover open={addOpen} onOpenChange={setAddOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={disabled}
-              className="w-full sm:w-auto"
-            >
-              Add product
+      <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || pending}
+            className="w-full sm:w-auto"
+          >
+            Add product
+            {pending ? (
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+            ) : (
               <ChevronsUpDownIcon className="ml-2 h-4 w-4 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[min(100vw-2rem,24rem)] p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search product…" />
-              <CommandList>
-                <ScrollArea className="h-48 rounded-md border-0">
-                  <CommandEmpty>No product found.</CommandEmpty>
-                  <CommandGroup>
-                    {available.map((p) => (
-                      <CommandItem
-                        key={p.id}
-                        value={`${p.productName} ${p.id}`}
-                        onSelect={() => addProduct(p.id)}
-                      >
-                        <CheckIcon className="mr-2 h-4 w-4 opacity-0" />
-                        <span className="uppercase">{p.productName}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </ScrollArea>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      )}
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[min(100vw-2rem,24rem)] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Search or type a new product…"
+              value={search}
+              onValueChange={setSearch}
+            />
+            <CommandList>
+              <ScrollArea className="h-48 rounded-md border-0">
+                <CommandEmpty>
+                  {q && !exactMatch ? (
+                    <button
+                      type="button"
+                      className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent"
+                      onClick={() => void handleCreateProduct()}
+                      disabled={pending}
+                    >
+                      Create &amp; add &quot;{search.trim().toUpperCase()}&quot;
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground text-sm px-2">
+                      Type a product name to search or create.
+                    </span>
+                  )}
+                </CommandEmpty>
+                <CommandGroup>
+                  {filteredPick.map((p) => (
+                    <CommandItem
+                      key={p.id}
+                      value={`${p.productName} ${p.id}`}
+                      onSelect={() => addProduct(p.id)}
+                    >
+                      <CheckIcon className="mr-2 h-4 w-4 opacity-0" />
+                      <span className="uppercase">{p.productName}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </ScrollArea>
+            </CommandList>
+          </Command>
+          {q && !exactMatch && (
+            <div className="border-t p-2">
+              <Button
+                type="button"
+                size="sm"
+                className="w-full"
+                disabled={pending}
+                onClick={() => void handleCreateProduct()}
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  <>
+                    Create &amp; add &quot;{search.trim().toUpperCase()}&quot;
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

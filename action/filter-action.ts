@@ -134,6 +134,7 @@ export interface FilteredLocalCustomerData {
   userId: string;
   customerName: string;
   address: string;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,6 +166,7 @@ export interface FilteredLocalProductData {
   id: string;
   userId: string;
   productName: string;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1016,6 +1018,9 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
               mode: "insensitive" as const,
             },
           },
+          {
+            tags: { has: globalSearch.trim().toUpperCase() },
+          },
         ];
       }
     }
@@ -1078,6 +1083,7 @@ export const filterCustomers = async (params: CustomerFilterParams) => {
           userId: localCustomer.userId || "",
           customerName: localCustomer.customerName,
           address: localCustomer.address,
+          tags: localCustomer.tags ?? [],
           createdAt: localCustomer.createdAt,
           updatedAt: localCustomer.updatedAt,
         } as FilteredLocalCustomerData;
@@ -1147,6 +1153,9 @@ export const filterProducts = async (params: ProductFilterParams) => {
               mode: "insensitive" as const,
             },
           },
+          {
+            tags: { has: globalSearch.trim().toUpperCase() },
+          },
         ];
       }
     }
@@ -1207,6 +1216,7 @@ export const filterProducts = async (params: ProductFilterParams) => {
           id: localProduct.id,
           userId: localProduct.userId || "", // Assuming userId can be null for LocalProduct
           productName: localProduct.productName,
+          tags: localProduct.tags ?? [],
           createdAt: localProduct.createdAt,
           updatedAt: localProduct.updatedAt,
         } as FilteredLocalProductData;

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { CheckIcon, ChevronsUpDownIcon, Download } from "lucide-react";
+import Link from "next/link";
+import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
@@ -39,27 +40,26 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { TagBadge } from "@/components/ui/tag-badge";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Customer, LocalCustomer, LocalProduct, Product } from "@prisma/client";
+import {
+  Customer,
+  LocalCustomer,
+  LocalProduct,
+  PlantCustomer,
+  PlantProduct,
+  Product,
+} from "@prisma/client";
 import {
   createCustomerProductEntry,
   getLinesFromLastCustomerProductEntry,
-  listCustomerProductEntries,
-  CustomerProductEntryListRow,
   type EntryKind,
 } from "@/action/customer-product-entry";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ProductLinesEditor } from "@/components/customer-product-entry/product-lines-editor";
+import { FlexiblePlantCustomerCombobox } from "@/components/customer-product-entry/flexible-plant-customer-combobox";
+import { FlexiblePlantProductLinesEditor } from "@/components/customer-product-entry/flexible-plant-product-lines-editor";
 
 function todayInputDate() {
   return format(new Date(), "yyyy-MM-dd");
@@ -86,11 +86,15 @@ export function CustomerProductEntriesView({
   localCustomers,
   gstProducts,
   localProducts,
+  plantCustomers,
+  plantProducts,
 }: {
   gstCustomers: Customer[];
   localCustomers: LocalCustomer[];
   gstProducts: Product[];
   localProducts: LocalProduct[];
+  plantCustomers: PlantCustomer[];
+  plantProducts: PlantProduct[];
 }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
@@ -112,18 +116,26 @@ export function CustomerProductEntriesView({
 
   const allTagOptions = useMemo(() => {
     const s = new Set<string>();
-    for (const c of gstCustomers) {
-      for (const t of c.tags ?? []) {
+    const add = (tags: string[] | undefined) => {
+      for (const t of tags ?? []) {
         if (t?.trim()) s.add(t.trim().toUpperCase());
       }
-    }
-    for (const p of gstProducts) {
-      for (const t of p.tags ?? []) {
-        if (t?.trim()) s.add(t.trim().toUpperCase());
-      }
-    }
+    };
+    for (const c of gstCustomers) add(c.tags);
+    for (const p of gstProducts) add(p.tags);
+    for (const c of localCustomers) add(c.tags);
+    for (const p of localProducts) add(p.tags);
+    for (const c of plantCustomers) add(c.tags);
+    for (const p of plantProducts) add(p.tags);
     return [...s].sort((a, b) => a.localeCompare(b));
-  }, [gstCustomers, gstProducts]);
+  }, [
+    gstCustomers,
+    gstProducts,
+    localCustomers,
+    localProducts,
+    plantCustomers,
+    plantProducts,
+  ]);
 
   const gstCustomersRows: CustomerRow[] = useMemo(
     () =>
@@ -160,11 +172,68 @@ export function CustomerProductEntriesView({
     );
   }, [gstProducts, tagFilter]);
 
-  const customersList = entryKind === "gst" ? filteredGstCustomers : localCustomersRows;
+  const filteredLocalCustomers = useMemo(() => {
+    if (tagFilter.length === 0) return localCustomersRows;
+    return localCustomersRows.filter((c) => {
+      const tags = localCustomers.find((x) => x.id === c.id)?.tags ?? [];
+      return tagFilter.some((t) => tags.includes(t));
+    });
+  }, [localCustomers, localCustomersRows, tagFilter]);
+
+  const filteredLocalProducts = useMemo(() => {
+    if (tagFilter.length === 0) return localProducts;
+    return localProducts.filter((p) =>
+      tagFilter.some((t) => (p.tags ?? []).includes(t))
+    );
+  }, [localProducts, tagFilter]);
+
+  const plantCustomersRows: CustomerRow[] = useMemo(
+    () =>
+      plantCustomers.map((c) => ({
+        id: c.id,
+        customerName: c.customerName,
+        address: c.address,
+      })),
+    [plantCustomers]
+  );
+
+  const filteredPlantCustomers = useMemo(() => {
+    if (tagFilter.length === 0) return plantCustomersRows;
+    return plantCustomersRows.filter((c) => {
+      const tags = plantCustomers.find((x) => x.id === c.id)?.tags ?? [];
+      return tagFilter.some((t) => tags.includes(t));
+    });
+  }, [plantCustomers, plantCustomersRows, tagFilter]);
+
+  const filteredPlantProducts = useMemo(() => {
+    if (tagFilter.length === 0) return plantProducts;
+    return plantProducts.filter((p) =>
+      tagFilter.some((t) => (p.tags ?? []).includes(t))
+    );
+  }, [plantProducts, tagFilter]);
+
+  const customersList =
+    entryKind === "gst"
+      ? filteredGstCustomers
+      : entryKind === "local"
+        ? filteredLocalCustomers
+        : filteredPlantCustomers;
+
   const productsList =
     entryKind === "gst"
-      ? filteredGstProducts.map((p) => ({ id: p.id, productName: p.productName }))
-      : localProducts.map((p) => ({ id: p.id, productName: p.productName }));
+      ? filteredGstProducts.map((p) => ({
+          id: p.id,
+          productName: p.productName,
+        }))
+      : entryKind === "local"
+        ? filteredLocalProducts.map((p) => ({
+            id: p.id,
+            productName: p.productName,
+          }))
+        : filteredPlantProducts.map((p) => ({
+            id: p.id,
+            productName: p.productName,
+          }));
 
   const filteredProductsRef = useRef(productsList);
   filteredProductsRef.current = productsList;
@@ -248,98 +317,13 @@ export function CustomerProductEntriesView({
         lineItems: [],
         notes: "",
       });
-      loadEntries();
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Failed to save entry.");
     }
   };
 
-  const [filterCustomerId, setFilterCustomerId] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const [rows, setRows] = useState<CustomerProductEntryListRow[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
-  const [loadingEntries, setLoadingEntries] = useState(true);
-
-  const loadEntries = useCallback(async () => {
-    if (!userId) return;
-    setLoadingEntries(true);
-    try {
-      const res = await listCustomerProductEntries({
-        userId,
-        customerId: filterCustomerId || undefined,
-        dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-        dateTo: dateTo ? new Date(dateTo) : undefined,
-        page,
-        pageSize,
-      });
-      setRows(res.rows);
-      setTotalCount(res.totalCount);
-      setPageCount(res.pageCount);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to load entries.");
-    } finally {
-      setLoadingEntries(false);
-    }
-  }, [userId, filterCustomerId, dateFrom, dateTo, page, pageSize]);
-
-  useEffect(() => {
-    loadEntries();
-  }, [loadEntries]);
-
-  const handleExportXlsx = async () => {
-    try {
-      const res = await fetch("/api/customer-product-entries/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: filterCustomerId || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Export failed");
-      }
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition");
-      const match = cd?.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? "export.xlsx";
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Download started.");
-    } catch (e) {
-      console.error(e);
-      toast.error(
-        e instanceof Error ? e.message : "Could not export. Try again."
-      );
-    }
-  };
-
   const currCustomer = customersList.find((c) => c.id === customerId);
-
-  const filterCustomerOptions = useMemo(() => {
-    const opts: { id: string; label: string }[] = [];
-    for (const c of gstCustomers) {
-      opts.push({ id: c.id, label: `[GST] ${c.customerName}` });
-    }
-    for (const c of localCustomers) {
-      opts.push({ id: c.id, label: `[General] ${c.customerName}` });
-    }
-    return opts.sort((a, b) => a.label.localeCompare(b.label));
-  }, [gstCustomers, localCustomers]);
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl">
@@ -347,15 +331,33 @@ export function CustomerProductEntriesView({
         <CardHeader>
           <CardTitle>Customer &amp; product entry</CardTitle>
           <CardDescription>
-            Works for both GST and General (local) customers. Tag filters apply
-            to GST only. Defaults come from the last saved entry for that
-            customer.
+            GST, General (local), and Plant entry types. Tags can be set on any
+            customer or product and used to narrow the pick lists below.
+            Defaults come from the last saved entry for that customer.{" "}
+            <Link
+              href="/customer-product-entries/saved"
+              className="text-primary underline underline-offset-2 font-medium"
+            >
+              View saved entries
+            </Link>
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmitEntry)}
+              onSubmitCapture={(e) => {
+                const formEl = e.currentTarget;
+                if (!(formEl instanceof HTMLFormElement)) return;
+                const active = document.activeElement;
+                if (
+                  active instanceof HTMLInputElement &&
+                  active.hasAttribute("data-qty-line") &&
+                  formEl.contains(active)
+                ) {
+                  active.blur();
+                }
+              }}
               className="space-y-6"
             >
               <div className="space-y-2">
@@ -364,9 +366,10 @@ export function CustomerProductEntriesView({
                   type="single"
                   value={entryKind}
                   onValueChange={(v) => {
-                    if (v === "gst" || v === "local") setEntryKind(v);
+                    if (v === "gst" || v === "local" || v === "plant")
+                      setEntryKind(v);
                   }}
-                  className="justify-start"
+                  className="justify-start flex-wrap"
                 >
                   <ToggleGroupItem value="gst" aria-label="GST">
                     GST
@@ -374,50 +377,54 @@ export function CustomerProductEntriesView({
                   <ToggleGroupItem value="local" aria-label="General">
                     General
                   </ToggleGroupItem>
+                  <ToggleGroupItem value="plant" aria-label="Plant">
+                    Plant
+                  </ToggleGroupItem>
                 </ToggleGroup>
                 <p className="text-xs text-muted-foreground">
-                  Choose whether this row uses GST customers/products or General
-                  (local) ones.
+                  GST uses registered GST masters; General uses local customers
+                  and products; Plant lets you type names and auto-creates
+                  records when needed.
                 </p>
               </div>
 
-              {entryKind === "gst" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">
-                    Filter by tags (optional)
-                  </label>
-                  {allTagOptions.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Add tags on GST customers or products to enable filtering.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {allTagOptions.map((t) => (
-                        <Badge
-                          key={t}
-                          variant={tagFilter.includes(t) ? "default" : "outline"}
-                          className="cursor-pointer font-normal"
-                          onClick={() =>
-                            setTagFilter((prev) =>
-                              prev.includes(t)
-                                ? prev.filter((x) => x !== t)
-                                : [...prev, t]
-                            )
-                          }
-                        >
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  {tagFilter.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Showing GST customers and products that match at least one
-                      selected tag.
-                    </p>
-                  )}
-                </div>
-              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  Filter by tags (optional)
+                </label>
+                {allTagOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Add tags on customers or products (any type) to enable
+                    filtering here.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {allTagOptions.map((t) => (
+                      <TagBadge
+                        key={t}
+                        tag={t}
+                        mode={tagFilter.includes(t) ? "selected" : "outline"}
+                        className="cursor-pointer font-bold"
+                        onClick={() =>
+                          setTagFilter((prev) =>
+                            prev.includes(t)
+                              ? prev.filter((x) => x !== t)
+                              : [...prev, t]
+                          )
+                        }
+                      >
+                        {t}
+                      </TagBadge>
+                    ))}
+                  </div>
+                )}
+                {tagFilter.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Showing customers and products for this type that match at
+                    least one selected tag.
+                  </p>
+                )}
+              </div>
 
               <FormField
                 control={form.control}
@@ -436,70 +443,94 @@ export function CustomerProductEntriesView({
               <FormField
                 control={form.control}
                 name="customerId"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col w-full">
-                    <FormLabel>Customer</FormLabel>
-                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between border-2 shadow",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {currCustomer
-                              ? currCustomer.customerName
-                              : "Select customer"}
-                            <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search customer…" />
-                          <CommandList>
-                            <ScrollArea className="h-48 rounded-md border pr-2">
-                              <CommandEmpty>
-                                {customersList.length === 0
-                                  ? entryKind === "gst"
-                                    ? "No customers match the tag filter."
-                                    : "No general customers yet."
-                                  : "No customer found."}
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {customersList.map((c) => (
-                                  <CommandItem
-                                    key={c.id}
-                                    value={`${c.customerName} ${c.address}`}
-                                    onSelect={() => {
-                                      form.setValue("customerId", c.id);
-                                      setPopoverOpen(false);
-                                    }}
-                                  >
-                                    <CheckIcon
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        c.id === field.value
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      )}
-                                    />
-                                    {c.customerName}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </ScrollArea>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) =>
+                  entryKind === "plant" ? (
+                    <FormItem className="flex flex-col w-full">
+                      <FormLabel>Customer</FormLabel>
+                      <FormControl>
+                        <FlexiblePlantCustomerCombobox
+                          userId={userId}
+                          customers={
+                            tagFilter.length === 0
+                              ? plantCustomers
+                              : plantCustomers.filter((c) =>
+                                  tagFilter.some((t) =>
+                                    (c.tags ?? []).includes(t)
+                                  )
+                                )
+                          }
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  ) : (
+                    <FormItem className="flex flex-col w-full">
+                      <FormLabel>Customer</FormLabel>
+                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between border-2 shadow",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {currCustomer
+                                ? currCustomer.customerName
+                                : "Select customer"}
+                              <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search customer…" />
+                            <CommandList>
+                              <ScrollArea className="h-48 rounded-md border pr-2">
+                                <CommandEmpty>
+                                  {customersList.length === 0
+                                    ? entryKind === "gst"
+                                      ? "No customers match the tag filter."
+                                      : "No general customers match the tag filter."
+                                    : "No customer found."}
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {customersList.map((c) => (
+                                    <CommandItem
+                                      key={c.id}
+                                      value={`${c.customerName} ${c.address}`}
+                                      onSelect={() => {
+                                        form.setValue("customerId", c.id);
+                                        setPopoverOpen(false);
+                                      }}
+                                    >
+                                      <CheckIcon
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          c.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      {c.customerName}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </ScrollArea>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }
               />
 
               <FormField
@@ -509,12 +540,30 @@ export function CustomerProductEntriesView({
                   <FormItem>
                     <FormLabel>Products &amp; quantities</FormLabel>
                     <FormControl>
-                      <ProductLinesEditor
-                        products={productsList}
-                        value={field.value}
-                        onChange={field.onChange}
-                        disabled={isSubmitting}
-                      />
+                      {entryKind === "plant" ? (
+                        <FlexiblePlantProductLinesEditor
+                          userId={userId}
+                          products={
+                            tagFilter.length === 0
+                              ? plantProducts
+                              : plantProducts.filter((p) =>
+                                  tagFilter.some((t) =>
+                                    (p.tags ?? []).includes(t)
+                                  )
+                                )
+                          }
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      ) : (
+                        <ProductLinesEditor
+                          products={productsList}
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      )}
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -548,156 +597,6 @@ export function CustomerProductEntriesView({
               </Button>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Saved entries</CardTitle>
-            <CardDescription>
-              Filter by customer and/or date range (matches entry date when set,
-              otherwise saved time for older rows), then export to Excel.
-            </CardDescription>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="gap-2 shrink-0"
-            onClick={handleExportXlsx}
-          >
-            <Download className="h-4 w-4" />
-            Export XLSX
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="space-y-1.5 flex-1 min-w-[200px]">
-              <label className="text-sm font-medium">Customer (optional)</label>
-              <select
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                value={filterCustomerId}
-                onChange={(e) => {
-                  setFilterCustomerId(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">All customers</option>
-                {filterCustomerOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">From</label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">To</label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[88px]">Type</TableHead>
-                  <TableHead>Entry date</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Products</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingEntries ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground"
-                    >
-                      Loading…
-                    </TableCell>
-                  </TableRow>
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground"
-                    >
-                      No entries yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs font-medium">
-                        {r.kind === "gst" ? "GST" : "General"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {format(
-                          r.entryDate ?? r.createdAt,
-                          "dd/MM/yyyy HH:mm"
-                        )}
-                      </TableCell>
-                      <TableCell>{r.customerName}</TableCell>
-                      <TableCell className="max-w-[280px] text-sm">
-                        {r.productNames}
-                      </TableCell>
-                      <TableCell className="max-w-[200px] text-sm text-muted-foreground">
-                        {r.notes || "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {totalCount > pageSize && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {totalCount} total · page {page} of {pageCount}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

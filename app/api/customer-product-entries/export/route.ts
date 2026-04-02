@@ -15,10 +15,12 @@ export async function POST(request: NextRequest) {
       customerId,
       dateFrom,
       dateTo,
+      tagFilter,
     }: {
       customerId?: string;
       dateFrom?: string;
       dateTo?: string;
+      tagFilter?: string[];
     } = body;
 
     const result = await exportCustomerProductEntriesToXLSX({
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
       customerId: customerId || undefined,
       dateFrom,
       dateTo,
+      tagFilter,
     });
 
     return new NextResponse(result.buffer, {

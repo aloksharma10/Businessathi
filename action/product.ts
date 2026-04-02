@@ -70,12 +70,14 @@ export const CreateLocalProduct = async (values: any, userId: string) => {
     const newLocalProduct = await prisma.localProduct.create({
       data: {
         productName: values.values.productName.toUpperCase(),
+        tags: normalizeTags(values.values.tags),
         userId: userId || "",
       },
     });
     revalidatePath("/dashboard");
     revalidatePath("/local/create-invoice");
     revalidatePath("/local/products");
+    revalidatePath("/customer-product-entries");
     return newLocalProduct;
   } catch (error) {
     console.error(error, "[CreateLocalProduct]");
@@ -83,18 +85,24 @@ export const CreateLocalProduct = async (values: any, userId: string) => {
 };
 export const UpdateLocalProduct = async (id: string, values: any) => {
   try {
+    const tagList = normalizeTags(
+      Array.isArray(values?.tags) ? values.tags : []
+    );
     const editLocalProduct = await prisma.localProduct.update({
       where: { id },
       data: {
         productName: values.productName.toUpperCase(),
+        tags: { set: tagList },
       },
     });
     revalidatePath("/dashboard");
     revalidatePath("/local/create-invoice");
     revalidatePath("/local/products");
+    revalidatePath("/customer-product-entries");
     return editLocalProduct;
   } catch (error) {
     console.error(error, "[UpdateLocalProduct]");
+    throw error;
   }
 };
 export const DeleteLocalProduct = async (id: string) => {
