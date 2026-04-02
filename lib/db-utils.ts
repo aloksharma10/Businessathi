@@ -53,7 +53,8 @@ export const getLastLocalInvoiceNo = async (userId: string): Promise<any> => {
   }
 };
 
-export const getLastGSTInvoiceNo = async (userId: string): Promise<any> => {
+/** @deprecated Use getNextGstInvoiceNumber from @/action/invoice */
+export const getLastGSTInvoiceNo = async (userId: string): Promise<string> => {
   try {
     const response = await prisma.invoice.findFirst({
       where: {
@@ -63,10 +64,10 @@ export const getLastGSTInvoiceNo = async (userId: string): Promise<any> => {
         createdAt: "desc",
       },
     });
-    return response?.invoiceNo || 387;
+    return response?.invoiceNo ?? "";
   } catch (error) {
     console.log(error, "error");
     console.error("Error fetching last gst invoice number:", error);
-    return 387;
+    return "";
   }
 };

@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { normalizeInvoicePrefix } from "@/lib/invoice-number";
 
 export const CreateCompanyProfile = async (values: any, userId: string) => {
   try {
@@ -10,6 +11,15 @@ export const CreateCompanyProfile = async (values: any, userId: string) => {
     if (values.companyType === "gst") {
       // Update GST company profile fields
       updateData.companyName = values.companyName;
+      if (values.gstInvoicePrefix !== undefined) {
+        const raw =
+          typeof values.gstInvoicePrefix === "string"
+            ? values.gstInvoicePrefix.trim()
+            : "";
+        updateData.gstInvoicePrefix = raw
+          ? normalizeInvoicePrefix(raw) || null
+          : null;
+      }
       updateData.companyAddress = values.companyAddress;
       updateData.gstNo = values.gstNo;
       updateData.state = values.state;

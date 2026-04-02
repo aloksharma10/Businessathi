@@ -184,7 +184,8 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
       dateTo,
       page = 1,
       pageSize = 15,
-      sortBy = invoiceType === "gst" ? "invoiceNo" : "localInvoiceNo",
+      sortBy =
+        invoiceType === "gst" ? "createdAt" : "localInvoiceNo",
       sortOrder = "desc",
     } = params;
 
@@ -513,7 +514,11 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
 
     if (params.exportType === "titan") {
       const sortedData = [...invoices].sort(
-        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+        (a, b) =>
+          a.invoiceNo.localeCompare(b.invoiceNo, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
       );
       exportData = sortedData.map((row) => {
         const codeMatch = row.address?.match(/\(([^)]+)\)\s*$/);
@@ -543,7 +548,11 @@ export const exportInvoicesToXLSX = async (params: InvoiceFilterParams) => {
       sheetName = "Titan Invoices";
     } else if (params.exportType === "gst") {
       const sortedData = [...invoices].sort(
-        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+        (a, b) =>
+          a.invoiceNo.localeCompare(b.invoiceNo, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
       );
       exportData = sortedData.flatMap((invoice) => {
         return invoice.pricedProducts.map((product: PricedProduct) => ({
@@ -664,7 +673,11 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
 
     if (params.exportType === "titan") {
       const sortedData = [...invoices].sort(
-        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+        (a, b) =>
+          a.invoiceNo.localeCompare(b.invoiceNo, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
       );
       headers = [
         "Invoice Number",
@@ -698,7 +711,11 @@ export const exportInvoicesToCSV = async (params: InvoiceFilterParams) => {
       )}.csv`;
     } else if (params.exportType === "gst") {
       const sortedData = [...invoices].sort(
-        (a, b) => Number(a.invoiceNo) - Number(b.invoiceNo)
+        (a, b) =>
+          a.invoiceNo.localeCompare(b.invoiceNo, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
       );
       headers = [
         "Invoice No",

@@ -16,6 +16,8 @@ model Users {
 
   // company profile ( Already present in the user table )
   companyName    String? @db.String
+  /// Optional short code for GST invoice numbers (e.g. CN, ABCD). If unset, derived from companyName.
+  gstInvoicePrefix String? @db.String
   gstNo          String? @db.String
   companyAddress String? @db.String
   state          String? @db.String

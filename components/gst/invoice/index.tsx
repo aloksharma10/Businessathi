@@ -12,6 +12,13 @@ import { auth } from "@/auth";
 export const Invoice = async () => {
   const session = await auth();
 
+  const profile = session?.user?.id
+    ? await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { companyName: true },
+      })
+    : null;
+
   const customers = await prisma.customer.findMany({
     where: {
       userId: session?.user?.id,
@@ -34,7 +41,9 @@ export const Invoice = async () => {
   return (
     <Card className="border-2 shadow-lg">
       <CardHeader className="px-5 lg:px-6">
-        <CardTitle>{session?.user.companyName}</CardTitle>
+        <CardTitle>
+          {profile?.companyName ?? session?.user?.companyName ?? "Company"}
+        </CardTitle>
         <CardDescription>Create Invoice</CardDescription>
       </CardHeader>
       <CardContent className="px-2 lg:px-6">
@@ -43,7 +52,7 @@ export const Invoice = async () => {
           customers={customers || []}
           products={products || []}
           lastInvoiceNo={invoices?.invoiceNo || ""}
-          lastInvoiceDate={invoices?.invoiceDate || new Date()}
+          lastInvoiceDate={new Date()}
         />
       </CardContent>
     </Card>

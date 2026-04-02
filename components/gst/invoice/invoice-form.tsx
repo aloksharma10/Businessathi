@@ -38,7 +38,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CreateInvoice, UpdateInvoice } from "@/action/invoice";
+import {
+  CreateInvoice,
+  UpdateInvoice,
+  getNextGstInvoiceNumber,
+} from "@/action/invoice";
 import { useParams } from "next/navigation";
 import { Customer } from "@prisma/client";
 import { useSession } from "next-auth/react";
@@ -46,7 +50,6 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import MultipleSelector from "@/components/ui/multi-selector";
-import { getLastGSTInvoiceNo } from "@/lib/db-utils";
 import { useLoading } from "@/components/providers/loading-provider";
 
 const formSchemaInvoice = z.object({
@@ -84,7 +87,6 @@ export const InvoiceForm = ({
   const [productPrices, setProductPrices] = useState<any[]>([]);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [isLoadingInvoiceNo, setIsLoadingInvoiceNo] = useState(true);
-  const [currentInvoiceNo, setCurrentInvoiceNo] = useState(lastInvoiceNo);
   const { isLoading, setIsLoading } = useLoading();
 
   const params = useParams();
@@ -95,34 +97,11 @@ export const InvoiceForm = ({
     currDate.setMonth(currDate.getMonth() - 1)
   ).toLocaleString("en-US", { month: "long" });
 
-  const fetchLastInvoiceNo = async () => {
-    if (!session.data?.user?.id) return;
-
-    setIsLoadingInvoiceNo(true);
-    try {
-      const invoiceNo = await getLastGSTInvoiceNo(session.data.user.id);
-      const nextInvoiceNo = (Number(invoiceNo) + 1).toString();
-      setCurrentInvoiceNo(nextInvoiceNo);
-      form.setValue(
-        "invoiceNo",
-        isEdit ? invoiceInfo?.invoiceNo : nextInvoiceNo
-      );
-    } catch (error) {
-      console.error("Error fetching last invoice number:", error);
-      toast.error("Failed to fetch invoice number");
-      setCurrentInvoiceNo((Number(lastInvoiceNo) + 1).toString());
-    } finally {
-      setIsLoadingInvoiceNo(false);
-    }
-  };
-
   const form = useForm({
     resolver: zodResolver(formSchemaInvoice),
     defaultValues: {
-      invoiceNo: isEdit
-        ? lastInvoiceNo
-        : (lastInvoiceNo ? Number(lastInvoiceNo) + 1 : 2001).toString(),
-      invoiceDate: lastInvoiceDate,
+      invoiceNo: isEdit ? lastInvoiceNo : "",
+      invoiceDate: lastInvoiceDate ?? new Date(),
       monthOf: lastMonth,
       yearOf: currDate.getFullYear().toString(),
       customerId: "",
@@ -133,11 +112,29 @@ export const InvoiceForm = ({
     },
   });
 
+  const fetchNextInvoiceNo = async () => {
+    const uid = session.data?.user?.id;
+    if (!uid || isEdit) return;
+
+    setIsLoadingInvoiceNo(true);
+    try {
+      const date = form.getValues("invoiceDate") ?? new Date();
+      const nextInvoiceNo = await getNextGstInvoiceNumber(uid, date);
+      form.setValue("invoiceNo", nextInvoiceNo);
+    } catch (error) {
+      console.error("Error fetching invoice number:", error);
+      toast.error("Failed to fetch invoice number");
+    } finally {
+      setIsLoadingInvoiceNo(false);
+    }
+  };
+
   const {
     formState: { isSubmitting },
   } = form;
 
   const currCustomerId = form.watch("customerId");
+  const watchedInvoiceDate = form.watch("invoiceDate");
   const selectProduct = form.watch("productDetails");
 
   const currCustomer = customers.find(
@@ -148,8 +145,36 @@ export const InvoiceForm = ({
     false;
 
   useEffect(() => {
-    fetchLastInvoiceNo();
-  }, [session.data?.user?.id]);
+    if (isEdit || !session.data?.user?.id) {
+      setIsLoadingInvoiceNo(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsLoadingInvoiceNo(true);
+      try {
+        const date = form.getValues("invoiceDate") ?? new Date();
+        const uid = session.data?.user?.id;
+        if (!uid) return;
+        const nextInvoiceNo = await getNextGstInvoiceNumber(uid, date);
+        if (!cancelled) {
+          form.setValue("invoiceNo", nextInvoiceNo);
+        }
+      } catch (error) {
+        console.error("Error fetching invoice number:", error);
+        if (!cancelled) {
+          toast.error("Failed to fetch invoice number");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingInvoiceNo(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.data?.user?.id, isEdit, watchedInvoiceDate]);
 
   useEffect(() => {
     const newSelecctedProducts = selectProduct.map((product: any) => {
@@ -243,7 +268,7 @@ export const InvoiceForm = ({
             : "Invoice created successfully"
         );
         form.reset();
-        await fetchLastInvoiceNo(); // Refresh invoice number after successful submission
+        await fetchNextInvoiceNo();
       }
     } catch (error) {
       toast.error("Failed to create invoice");

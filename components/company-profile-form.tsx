@@ -33,6 +33,10 @@ const FormSchemaCompanyDetails = z
     }),
     // GST Company fields
     companyName: z.string().optional(),
+    gstInvoicePrefix: z
+      .string()
+      .max(8, "Use at most 8 letters or digits")
+      .optional(),
     companyAddress: z.string().optional(),
     gstNo: z.string().optional(),
     state: z.string().optional(),
@@ -143,6 +147,7 @@ export const CompanyProfileForm = () => {
     defaultValues: {
       companyType: undefined,
       companyName: "",
+      gstInvoicePrefix: "",
       companyAddress: "",
       gstNo: "",
       state: "",
@@ -185,6 +190,8 @@ export const CompanyProfileForm = () => {
 
       // Set existing values
       if (user.companyName) form.setValue("companyName", user.companyName);
+      if (user.gstInvoicePrefix)
+        form.setValue("gstInvoicePrefix", user.gstInvoicePrefix);
       if (user.companyAddress)
         form.setValue("companyAddress", user.companyAddress);
       if (user.gstNo) form.setValue("gstNo", user.gstNo);
@@ -265,6 +272,22 @@ export const CompanyProfileForm = () => {
                   <FormControl>
                     <Input
                       placeholder="Enter your company's registered legal name"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="gstInvoicePrefix"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>GST invoice prefix (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. CN or ABCD — used in invoice numbers like CN/26-27/0001"
                       {...field}
                     />
                   </FormControl>
