@@ -10,6 +10,7 @@ declare module "next-auth" {
       id?: string;
       // GST Company Profile fields
       companyName?: string | null;
+      gstInvoicePrefix?: string | null;
       companyAddress?: string | null;
       gstNo?: string | null;
       state?: string | null;
@@ -86,6 +87,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.id = user.id || token.sub;
           // GST Company Profile fields
           session.user.companyName = user.companyName || null;
+          session.user.gstInvoicePrefix = user.gstInvoicePrefix || null;
           session.user.companyAddress = user.companyAddress || null;
           session.user.gstNo = user.gstNo || null;
           session.user.state = user.state || null;

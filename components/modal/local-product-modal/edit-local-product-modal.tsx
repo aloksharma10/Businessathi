@@ -30,7 +30,14 @@ export const EditLocalProductModal = () => {
             Update the product&apos;s information as needed.
           </DialogDescription>
         </DialogHeader>
-        <LocalProductForm localProductData={data.localProduct} />
+        <LocalProductForm
+          key={
+            isOpenModel && data.localProduct
+              ? `edit-local-product-${data.localProduct.id}`
+              : "closed"
+          }
+          localProductData={data.localProduct}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -16,6 +16,8 @@ model Users {
 
   // company profile ( Already present in the user table )
   companyName    String? @db.String
+  /// Optional short code for GST invoice numbers (e.g. CN, ABCD). If unset, derived from companyName.
+  gstInvoicePrefix String? @db.String
   gstNo          String? @db.String
   companyAddress String? @db.String
   state          String? @db.String
@@ -32,12 +34,15 @@ model Users {
   contactNo           String? @db.String
   additionalContactNo String? @db.String
 
-  invoice       Invoice[]
-  product       Product[]
-  customer      Customer[]
-  localInvoice  LocalInvoice[]
-  localProduct  LocalProduct[]
-  localCustomer LocalCustomer[]
+  invoice                 Invoice[]
+  product                 Product[]
+  customer                Customer[]
+  localInvoice            LocalInvoice[]
+  localProduct            LocalProduct[]
+  localCustomer           LocalCustomer[]
+  plantCustomer           PlantCustomer[]
+  plantProduct            PlantProduct[]
+  customerProductEntries  CustomerProductEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,6 +54,7 @@ model Product {
   hsnCode     Int    @db.Int
   cgstRate    Float
   sgstRate    Float
+  tags        String[] @default([])
 
   customPrice CustomPrice[]
 
@@ -91,11 +97,44 @@ model Customer {
   gstIn        String @db.String
   state        String @db.String
   stateCode    Int    @db.Int
+  tags         String[] @default([])
 
   userId String @db.ObjectId
   user   Users  @relation(fields: [userId], references: [id])
 
-  invoice Invoice[]
+  invoice                 Invoice[]
+  customerProductEntries  CustomerProductEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomerProductEntry {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  /// "gst" | "local" | "plant"
+  kind String @default("gst")
+
+  /// Legacy: use `productLines` when present. Kept for existing documents.
+  productIds   String[] @default([])
+  /// [{ "productId": string, "qty": number }]
+  productLines Json?
+
+  /// Business date chosen when saving (defaults to today).
+  entryDate DateTime?
+
+  notes String? @db.String
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  customerId String?   @db.ObjectId
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  localCustomerId String?        @db.ObjectId
+  localCustomer   LocalCustomer? @relation(fields: [localCustomerId], references: [id])
+
+  plantCustomerId String?        @db.ObjectId
+  plantCustomer   PlantCustomer? @relation(fields: [plantCustomerId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,11 +172,13 @@ model LocalCustomer {
 
   customerName String @db.String
   address      String @db.String
+  tags         String[] @default([])
 
   userId String? @db.ObjectId
   user   Users?  @relation(fields: [userId], references: [id])
 
-  invoice LocalInvoice[]
+  invoice                 LocalInvoice[]
+  customerProductEntries  CustomerProductEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -147,6 +188,7 @@ model LocalProduct {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   productName String @db.String
+  tags        String[] @default([])
 
   userId String? @db.ObjectId
   user   Users?  @relation(fields: [userId], references: [id])
@@ -155,6 +197,37 @@ model LocalProduct {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PlantCustomer {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerName String   @db.String
+  address      String   @default("") @db.String
+  tags         String[] @default([])
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  customerProductEntries CustomerProductEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, customerName], name: "uniq_plant_customer_user_name")
+}
+
+model PlantProduct {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productName String   @db.String
+  tags        String[] @default([])
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productName], name: "uniq_plant_product_user_name")
 }
 
 model LocalCustomPrice {
@@ -198,29 +271,3 @@ model LocalInvoice {
 
   @@unique([localInvoiceNo, userId], name: "unique_local_invoice_user")
 }
-
-// model PlantCustomer {
-//   id String @id @default(auto()) @map("_id") @db.ObjectId
-//   customerName String @db.String
-//   address      String @db.String
-//   userId String? @db.ObjectId
-//   user   Users?  @relation(fields: [userId], references: [id])
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-// model PlantCustomerProduct {
-//   id String @id @default(auto()) @map("_id") @db.ObjectId
-
-// customerId String @db.ObjectId
-// customer PlantCustomer @relation(fields: [customerId], references: [id])
-
-// productId String @db.ObjectId
-// product PlantProduct @relation(fields: [productId], references: [id])
-
-// notes String? @db.String
-
-//   time_stamp DateTime @default(now())
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }

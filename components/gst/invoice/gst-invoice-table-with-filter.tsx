@@ -94,7 +94,7 @@ export const GstInvoiceTableWithFilter = () => {
         globalSearch: filterState.globalSearch || undefined, // Ensure undefined for empty search
         dateFrom: filterState.dateFrom,
         dateTo: filterState.dateTo,
-        sortBy: filterState.sortBy || "invoiceNo",
+        sortBy: filterState.sortBy || "createdAt",
         sortOrder: filterState.sortOrder || "desc",
       });
     }
@@ -124,7 +124,7 @@ export const GstInvoiceTableWithFilter = () => {
       globalSearch: undefined,
       dateFrom: undefined,
       dateTo: undefined,
-      sortBy: "invoiceNo",
+      sortBy: "createdAt",
       sortOrder: "desc",
     });
     setSearchValue(""); // Reset search input
@@ -135,18 +135,17 @@ export const GstInvoiceTableWithFilter = () => {
     (sorting: { id: string; desc: boolean }[]) => {
       if (sorting.length > 0) {
         const { id, desc } = sorting[0];
-        // Only allow sorting on invoiceNo
-        if (id === "invoiceNo") {
+        if (id === "createdAt") {
           setFilterState((prev) => ({
             ...prev,
-            sortBy: "invoiceNo",
+            sortBy: "createdAt",
             sortOrder: desc ? "desc" : "asc",
           }));
         }
       } else {
         setFilterState((prev) => ({
           ...prev,
-          sortBy: "invoiceNo",
+          sortBy: "createdAt",
           sortOrder: "desc",
         }));
       }
@@ -170,7 +169,7 @@ export const GstInvoiceTableWithFilter = () => {
             globalSearch: filterState.globalSearch,
             dateFrom: filterState.dateFrom,
             dateTo: filterState.dateTo,
-            sortBy: filterState.sortBy || "invoiceNo",
+            sortBy: filterState.sortBy || "createdAt",
             sortOrder: filterState.sortOrder || "desc",
           });
           onOpen("titanCompanySubmit", {
@@ -186,7 +185,7 @@ export const GstInvoiceTableWithFilter = () => {
             exportType: "gst",
             dateFrom: filterState.dateFrom,
             dateTo: filterState.dateTo,
-            sortBy: filterState.sortBy || "invoiceNo",
+            sortBy: filterState.sortBy || "createdAt",
             sortOrder: filterState.sortOrder || "desc",
           });
           onOpen("gstSubmit", { xlsxDataForGST: xlsxResult.exportData });
@@ -339,28 +338,17 @@ export const GstInvoiceTableWithFilter = () => {
       },
       {
         accessorKey: "invoiceNo",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              className="hover:bg-slate-800 hover:text-white"
-              onClick={() =>
-                column.toggleSorting(column.getIsSorted() === "asc")
-              }
-            >
-              Invoice No
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
+        header: () => (
+          <div className="text-center font-medium">Invoice No</div>
+        ),
         cell: ({ row }) => {
           const id = row.original.id;
           const invoiceNo = row.original.invoiceNo;
           const isRowLoading = loadingInvoices.has(id);
-          const Icon = isRowLoading ? Loader : Download
+          const Icon = isRowLoading ? Loader : Download;
           return (
-            <div className="flex items-center justify-center">
-              {row.getValue("invoiceNo")}
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              <span className="font-mono text-sm">{row.getValue("invoiceNo")}</span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -392,6 +380,7 @@ export const GstInvoiceTableWithFilter = () => {
             </div>
           );
         },
+        enableSorting: false,
       },
       {
         accessorKey: "invoiceDate",
@@ -404,6 +393,27 @@ export const GstInvoiceTableWithFilter = () => {
           </div>
         ),
         enableSorting: false,
+      },
+      {
+        accessorKey: "createdAt",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="hover:bg-slate-800 hover:text-white"
+            onClick={() =>
+              column.toggleSorting(column.getIsSorted() === "asc")
+            }
+          >
+            Created
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <div className="text-center text-xs text-muted-foreground">
+            {format(row.original.createdAt, "dd-MMM-yyyy HH:mm")}
+          </div>
+        ),
+        enableSorting: true,
       },
       {
         accessorKey: "monthOf",
@@ -581,7 +591,7 @@ export const GstInvoiceTableWithFilter = () => {
                 <Label htmlFor="global-search">Global Search</Label>
                 <Input
                   id="global-search"
-                  placeholder="Search by invoice number, customer name, or address"
+                  placeholder="Search (e.g. CN/26-27/0001), customer, address"
                   value={searchValue}
                   onChange={handleSearch}
                 />
@@ -698,8 +708,8 @@ export const GstInvoiceTableWithFilter = () => {
         }}
         defaultSort={[
           {
-            id: filterState.sortBy || "invoiceNo",
-            desc: filterState.sortOrder === "desc",
+            id: filterState.sortBy || "createdAt",
+            desc: (filterState.sortOrder || "desc") === "desc",
           },
         ]}
         defaultVisibility={{

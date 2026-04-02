@@ -32,7 +32,14 @@ export const EditCustomerModal = () => {
             Update the customer&apos;s information as needed.
           </DialogDescription>
         </DialogHeader>
-        <CustomerForm customerData={data.customer as Customer} />
+        <CustomerForm
+          key={
+            isOpenModel && data.customer
+              ? `edit-customer-${data.customer.id}`
+              : "closed"
+          }
+          customerData={data.customer as Customer}
+        />
       </DialogContent>
     </Dialog>
   );

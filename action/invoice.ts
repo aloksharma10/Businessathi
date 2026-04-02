@@ -2,6 +2,45 @@
 
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import {
+  buildGstInvoiceNo,
+  getIndianFinancialYearLabel,
+  maxSerialForPrefixAndFy,
+  resolveGstInvoicePrefix,
+} from "@/lib/invoice-number";
+
+/** Next GST invoice number for the user: PREFIX/FY/SERIAL (e.g. CN/26-27/0001). */
+export async function getNextGstInvoiceNumber(
+  userId: string,
+  invoiceDate: Date
+): Promise<string> {
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: { companyName: true, gstInvoicePrefix: true },
+  });
+  if (!user) {
+    return buildGstInvoiceNo("INV", getIndianFinancialYearLabel(invoiceDate), 1);
+  }
+  const prefix = resolveGstInvoicePrefix(
+    user.companyName,
+    user.gstInvoicePrefix
+  );
+  const fy = getIndianFinancialYearLabel(invoiceDate);
+
+  const existing = await prisma.invoice.findMany({
+    where: {
+      userId,
+      invoiceNo: { startsWith: `${prefix}/${fy}/` },
+    },
+    select: { invoiceNo: true },
+  });
+  const maxSerial = maxSerialForPrefixAndFy(
+    existing.map((r) => r.invoiceNo),
+    prefix,
+    fy
+  );
+  return buildGstInvoiceNo(prefix, fy, maxSerial + 1);
+}
 
 export const CreateInvoice = async (
   values: any,
@@ -37,9 +76,8 @@ export const CreateInvoice = async (
         userId: userId,
       },
     });
-    // revalidatePath("/dashboard");
-    // revalidatePath("/gst/create-invoice");
-    // revalidatePath("/gst/invoices");
+    revalidatePath("/gst/create-invoice");
+    revalidatePath("/gst/invoices");
     return true;
   } catch (error) {
     console.log(error, "[CreateInvoice]");

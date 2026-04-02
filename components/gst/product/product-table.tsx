@@ -182,6 +182,22 @@ export const ProductTable = () => {
       },
     },
     {
+      id: "tags",
+      header: "Tags",
+      cell: ({ row }) => {
+        const product = row.original as FilteredProductData | FilteredLocalProductData;
+        if ("tags" in product && product.tags?.length) {
+          const t = product.tags;
+          return (
+            <div className="max-w-[200px] truncate text-sm" title={t.join(", ")}>
+              {t.join(", ")}
+            </div>
+          );
+        }
+        return <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
       id: "actions",
       header: "Actions",
       enableHiding: false,

@@ -30,7 +30,14 @@ export const EditLocalCustomerModal = () => {
             Update the customer&apos;s information as needed.
           </DialogDescription>
         </DialogHeader>
-        <LocalCustomerForm localCustomerData={data.localCustomer} />
+        <LocalCustomerForm
+          key={
+            isOpenModel && data.localCustomer
+              ? `edit-local-customer-${data.localCustomer.id}`
+              : "closed"
+          }
+          localCustomerData={data.localCustomer}
+        />
       </DialogContent>
     </Dialog>
   );

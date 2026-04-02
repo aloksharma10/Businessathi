@@ -19,6 +19,7 @@ import { useModal } from "@/store/store";
 import { useSession } from "next-auth/react";
 import { LocalCustomer } from "@prisma/client";
 import { useEffect } from "react";
+import { TagsInput } from "@/components/tags-input";
 
 const FormSchemaLocalCustomer = z.object({
   customerName: z.string().min(2, {
@@ -27,6 +28,7 @@ const FormSchemaLocalCustomer = z.object({
   address: z.string().min(2, {
     message: "Address must be at least 2 characters.",
   }),
+  tags: z.array(z.string()),
 });
 
 export const LocalCustomerForm = ({
@@ -42,41 +44,67 @@ export const LocalCustomerForm = ({
     defaultValues: {
       customerName: "",
       address: "",
+      tags: [],
     },
   });
 
   useEffect(() => {
-    if (localCustomerData) {
-      form.setValue("customerName", localCustomerData.customerName);
-      form.setValue("address", localCustomerData.address);
-    }
-  }, [localCustomerData, form]);
+    if (!localCustomerData) return;
+    form.reset({
+      customerName: localCustomerData.customerName,
+      address: localCustomerData.address,
+      tags: localCustomerData.tags ?? [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localCustomerData?.id]);
 
   async function onSubmit(data: z.infer<typeof FormSchemaLocalCustomer>) {
     try {
-      const isSuccess = localCustomerData
-        ? (await UpdateLocalCustomer(localCustomerData.id, data),
-          toast.success("Local customer updated successfully."))
-        : (await CreateLocalCustomer(
+      if (localCustomerData) {
+        await UpdateLocalCustomer(localCustomerData.id, data);
+        toast.success("Local customer updated successfully.");
+      } else {
+        await CreateLocalCustomer(
           { values: data },
           session.data?.user?.id || ""
-        ),
-          toast.success("Local customer created successfully."));
-      if (isSuccess) {
-        form.reset();
-        onClose();
-        // Trigger refresh for customer tables
-        triggerRefresh("gst-customers");
-        triggerRefresh("local-customers");
+        );
+        toast.success("Local customer created successfully.");
       }
+      form.reset();
+      onClose();
+      triggerRefresh("gst-customers");
+      triggerRefresh("local-customers");
     } catch (error) {
-      toast.error("Failed to create local customer.");
+      toast.error(
+        localCustomerData
+          ? "Failed to update local customer."
+          : "Failed to create local customer."
+      );
     }
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        className="space-y-6"
+        onSubmitCapture={() => {
+          const el = document.activeElement;
+          if (el instanceof HTMLInputElement) {
+            const typ = (el.type || "").toLowerCase();
+            if (
+              typ !== "submit" &&
+              typ !== "button" &&
+              typ !== "checkbox" &&
+              typ !== "radio" &&
+              typ !== "file" &&
+              typ !== "hidden"
+            ) {
+              el.blur();
+            }
+          }
+        }}
+        onSubmit={form.handleSubmit(onSubmit)}
+      >
         <FormField
           control={form.control}
           name="customerName"
@@ -102,6 +130,26 @@ export const LocalCustomerForm = ({
               <FormLabel>Address</FormLabel>
               <FormControl>
                 <Input className="uppercase" placeholder="Address" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="tags"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tags</FormLabel>
+              <FormControl>
+                <TagsInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  userId={session.data?.user?.id ?? ""}
+                  suggestionPool="all"
+                  scope="localCustomer"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

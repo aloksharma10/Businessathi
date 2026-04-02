@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { normalizeTags } from "@/lib/tag-utils";
 
 export const CreateProduct = async (values: any, userId: string) => {
   try {
@@ -11,6 +12,7 @@ export const CreateProduct = async (values: any, userId: string) => {
         hsnCode: Number(values.values.hsnCode),
         cgstRate: Number(values.values.cgstRate),
         sgstRate: Number(values.values.sgstRate),
+        tags: normalizeTags(values.values.tags),
         userId: userId || "",
       },
     });
@@ -25,6 +27,9 @@ export const CreateProduct = async (values: any, userId: string) => {
 
 export const UpdateProduct = async (id: string, values: any) => {
   try {
+    const tagList = normalizeTags(
+      Array.isArray(values?.tags) ? values.tags : []
+    );
     const editProduct = await prisma.product.update({
       where: { id },
       data: {
@@ -32,14 +37,17 @@ export const UpdateProduct = async (id: string, values: any) => {
         hsnCode: values.hsnCode ? Number(values.hsnCode) : undefined,
         cgstRate: values.cgstRate ? Number(values.cgstRate) : undefined,
         sgstRate: values.sgstRate ? Number(values.sgstRate) : undefined,
+        tags: { set: tagList },
       },
     });
     revalidatePath("/dashboard");
     revalidatePath("/gst/products");
     revalidatePath("/gst/create-invoice");
+    revalidatePath("/customer-product-entries");
     return editProduct;
   } catch (error) {
     console.error(error, "[UpdateProduct]");
+    throw error;
   }
 };
 
@@ -62,12 +70,14 @@ export const CreateLocalProduct = async (values: any, userId: string) => {
     const newLocalProduct = await prisma.localProduct.create({
       data: {
         productName: values.values.productName.toUpperCase(),
+        tags: normalizeTags(values.values.tags),
         userId: userId || "",
       },
     });
     revalidatePath("/dashboard");
     revalidatePath("/local/create-invoice");
     revalidatePath("/local/products");
+    revalidatePath("/customer-product-entries");
     return newLocalProduct;
   } catch (error) {
     console.error(error, "[CreateLocalProduct]");
@@ -75,18 +85,24 @@ export const CreateLocalProduct = async (values: any, userId: string) => {
 };
 export const UpdateLocalProduct = async (id: string, values: any) => {
   try {
+    const tagList = normalizeTags(
+      Array.isArray(values?.tags) ? values.tags : []
+    );
     const editLocalProduct = await prisma.localProduct.update({
       where: { id },
       data: {
         productName: values.productName.toUpperCase(),
+        tags: { set: tagList },
       },
     });
     revalidatePath("/dashboard");
     revalidatePath("/local/create-invoice");
     revalidatePath("/local/products");
+    revalidatePath("/customer-product-entries");
     return editLocalProduct;
   } catch (error) {
     console.error(error, "[UpdateLocalProduct]");
+    throw error;
   }
 };
 export const DeleteLocalProduct = async (id: string) => {

@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  ClipboardList,
   FileText,
   LayoutDashboardIcon,
+  ListChecks,
   Package,
   Plus,
   ReceiptTextIcon,
@@ -31,6 +33,16 @@ const navMain = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboardIcon,
+  },
+  {
+    title: "Data Entry",
+    url: "/customer-product-entries",
+    icon: ClipboardList,
+  },
+  {
+    title: "Saved entries",
+    url: "/customer-product-entries/saved",
+    icon: ListChecks,
   },
   {
     title: "Gst",
