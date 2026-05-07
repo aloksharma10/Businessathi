@@ -52,7 +52,7 @@ export const Invoice = async () => {
           customers={customers || []}
           products={products || []}
           lastInvoiceNo={invoices?.invoiceNo || ""}
-          lastInvoiceDate={new Date()}
+          lastInvoiceDate={invoices?.invoiceDate || new Date()}
         />
       </CardContent>
     </Card>
