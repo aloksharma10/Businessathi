@@ -43,7 +43,7 @@ import {
   UpdateInvoice,
   getNextGstInvoiceNumber,
 } from "@/action/invoice";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Customer } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -78,6 +78,7 @@ export const InvoiceForm = ({
   lastInvoiceNo: string;
   lastInvoiceDate: Date;
 }) => {
+  const router = useRouter();
   const productsOpt = products?.map((product) => ({
     label: product.productName,
     value: product.id,
@@ -260,6 +261,10 @@ export const InvoiceForm = ({
             },
             session.data?.user?.id || ""
           );
+
+        if(isEdit){
+          router.push(`gst/invoices`);
+        }
 
       if (isSuccess) {
         toast.success(
