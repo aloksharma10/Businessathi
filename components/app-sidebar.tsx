@@ -35,6 +35,11 @@ const navMain = [
     icon: LayoutDashboardIcon,
   },
   {
+    title: "Tanker",
+    url: "/tanker",
+    icon: ClipboardList,
+  },
+  {
     title: "Data Entry",
     url: "/customer-product-entries",
     icon: ClipboardList,

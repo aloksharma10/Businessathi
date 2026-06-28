@@ -263,7 +263,7 @@ export const InvoiceForm = ({
           );
 
         if(isEdit){
-          router.push(`gst/invoices`);
+          router.push(`/gst/invoices`);
         }
 
       if (isSuccess) {

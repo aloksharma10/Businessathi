@@ -15,17 +15,17 @@ model Users {
   image    String?
 
   // company profile ( Already present in the user table )
-  companyName    String? @db.String
+  companyName      String? @db.String
   /// Optional short code for GST invoice numbers (e.g. CN, ABCD). If unset, derived from companyName.
   gstInvoicePrefix String? @db.String
-  gstNo          String? @db.String
-  companyAddress String? @db.String
-  state          String? @db.String
-  stateCode      Int?    @db.Int
-  bankName       String? @db.String
-  bankBranch     String? @db.String
-  bankAccountNo  String? @db.String
-  bankIfscCode   String? @db.String
+  gstNo            String? @db.String
+  companyAddress   String? @db.String
+  state            String? @db.String
+  stateCode        Int?    @db.Int
+  bankName         String? @db.String
+  bankBranch       String? @db.String
+  bankAccountNo    String? @db.String
+  bankIfscCode     String? @db.String
 
   // for local company profile
   localCompanyName    String? @db.String
@@ -34,24 +34,24 @@ model Users {
   contactNo           String? @db.String
   additionalContactNo String? @db.String
 
-  invoice                 Invoice[]
-  product                 Product[]
-  customer                Customer[]
-  localInvoice            LocalInvoice[]
-  localProduct            LocalProduct[]
-  localCustomer           LocalCustomer[]
-  plantCustomer           PlantCustomer[]
-  plantProduct            PlantProduct[]
-  customerProductEntries  CustomerProductEntry[]
+  invoice                Invoice[]
+  product                Product[]
+  customer               Customer[]
+  localInvoice           LocalInvoice[]
+  localProduct           LocalProduct[]
+  localCustomer          LocalCustomer[]
+  plantCustomer          PlantCustomer[]
+  plantProduct           PlantProduct[]
+  customerProductEntries CustomerProductEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Product {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  productName String @db.String
-  hsnCode     Int    @db.Int
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productName String   @db.String
+  hsnCode     Int      @db.Int
   cgstRate    Float
   sgstRate    Float
   tags        String[] @default([])
@@ -66,13 +66,13 @@ model Product {
 }
 
 model CustomPrice {
-  id                String @id @default(auto()) @map("_id") @db.ObjectId
-  qty               Int    @db.Int
-  rate              Float
-  taxableValue      String
-  
-  cgstRate    Float?
-  sgstRate    Float?
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  qty          Int    @db.Int
+  rate         Float
+  taxableValue String
+
+  cgstRate Float?
+  sgstRate Float?
 
   cgstAmt           String
   sgstAmt           String
@@ -91,26 +91,26 @@ model CustomPrice {
 }
 
 model Customer {
-  id           String @id @default(auto()) @map("_id") @db.ObjectId
-  customerName String @db.String
-  address      String @db.String
-  gstIn        String @db.String
-  state        String @db.String
-  stateCode    Int    @db.Int
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerName String   @db.String
+  address      String   @db.String
+  gstIn        String   @db.String
+  state        String   @db.String
+  stateCode    Int      @db.Int
   tags         String[] @default([])
 
   userId String @db.ObjectId
   user   Users  @relation(fields: [userId], references: [id])
 
-  invoice                 Invoice[]
-  customerProductEntries  CustomerProductEntry[]
+  invoice                Invoice[]
+  customerProductEntries CustomerProductEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model CustomerProductEntry {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
   /// "gst" | "local" | "plant"
   kind String @default("gst")
 
@@ -170,15 +170,15 @@ model Invoice {
 model LocalCustomer {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  customerName String @db.String
-  address      String @db.String
+  customerName String   @db.String
+  address      String   @db.String
   tags         String[] @default([])
 
   userId String? @db.ObjectId
   user   Users?  @relation(fields: [userId], references: [id])
 
-  invoice                 LocalInvoice[]
-  customerProductEntries  CustomerProductEntry[]
+  invoice                LocalInvoice[]
+  customerProductEntries CustomerProductEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,7 +187,7 @@ model LocalCustomer {
 model LocalProduct {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  productName String @db.String
+  productName String   @db.String
   tags        String[] @default([])
 
   userId String? @db.ObjectId
@@ -245,7 +245,6 @@ model LocalCustomPrice {
 
   createdAt DateTime @default(now())
   updated   DateTime @updatedAt
-
 }
 
 model LocalInvoice {
@@ -270,4 +269,59 @@ model LocalInvoice {
   updatedAt DateTime @updatedAt
 
   @@unique([localInvoiceNo, userId], name: "unique_local_invoice_user")
+}
+
+model TankerDriver {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  driverName  String @db.String
+  driverPhone String @db.String
+
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  tankerBookings               TankerBooking[]
+  tankerDriverMonthlySummaries TankerDriverMonthlySummary[]
+
+  @@unique([driverName, driverPhone], name: "unique_tanker_driver_name_phone")
+}
+
+model Tanker {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  tankerNo   String   @db.String
+  tankerDate DateTime @default(now())
+  monthOf    String   @db.String
+  yearOf     String   @db.String
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tankerBookings TankerBooking[]
+}
+
+model TankerBooking {
+  id       String       @id @default(auto()) @map("_id") @db.ObjectId
+  tankerId String       @db.ObjectId
+  tanker   Tanker       @relation(fields: [tankerId], references: [id])
+  driverId String       @db.ObjectId
+  driver   TankerDriver @relation(fields: [driverId], references: [id])
+
+  waterLiters Int    @db.Int
+  amount      String @db.String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TankerDriverMonthlySummary {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  driverId String       @db.ObjectId
+  driver   TankerDriver @relation(fields: [driverId], references: [id])
+  monthOf  String       @db.String
+  yearOf   String       @db.String
+
+  totalWaterLiters Int    @db.Int
+  totalAmount      String @db.String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

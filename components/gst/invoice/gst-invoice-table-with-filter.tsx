@@ -394,27 +394,27 @@ export const GstInvoiceTableWithFilter = () => {
         ),
         enableSorting: false,
       },
-      {
-        accessorKey: "createdAt",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="hover:bg-slate-800 hover:text-white"
-            onClick={() =>
-              column.toggleSorting(column.getIsSorted() === "asc")
-            }
-          >
-            Created
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => (
-          <div className="text-center text-xs text-muted-foreground">
-            {format(row.original.createdAt, "dd-MMM-yyyy HH:mm")}
-          </div>
-        ),
-        enableSorting: true,
-      },
+      // {
+      //   accessorKey: "createdAt",
+      //   header: ({ column }) => (
+      //     <Button
+      //       variant="ghost"
+      //       className="hover:bg-slate-800 hover:text-white"
+      //       onClick={() =>
+      //         column.toggleSorting(column.getIsSorted() === "asc")
+      //       }
+      //     >
+      //       Created
+      //       <ArrowUpDown className="ml-2 h-4 w-4" />
+      //     </Button>
+      //   ),
+      //   cell: ({ row }) => (
+      //     <div className="text-center text-xs text-muted-foreground">
+      //       {format(row.original.createdAt, "dd-MMM-yyyy HH:mm")}
+      //     </div>
+      //   ),
+      //   enableSorting: true,
+      // },
       {
         accessorKey: "monthOf",
         header: () => {
