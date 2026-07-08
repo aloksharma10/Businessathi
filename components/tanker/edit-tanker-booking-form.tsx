@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, parse } from "date-fns";
 import { CheckIcon, ChevronsUpDownIcon, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +37,10 @@ import {
   type TankerBookingRow,
   type TankerDriverOption,
 } from "@/action/tanker";
+import {
+  bookingDateFromInput,
+  bookingDateToInput,
+} from "@/lib/tanker-date";
 
 const schema = z.object({
   bookingDate: z.string().min(1, "Pick a booking date."),
@@ -67,7 +70,7 @@ export function EditTankerBookingForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      bookingDate: format(new Date(booking.tankerDate), "yyyy-MM-dd"),
+      bookingDate: bookingDateToInput(booking.tankerDate),
       driverId: booking.driverId,
       waterLiters: booking.waterLiters,
       amount: parseFloat(booking.amount),
@@ -76,7 +79,7 @@ export function EditTankerBookingForm({
 
   useEffect(() => {
     form.reset({
-      bookingDate: format(new Date(booking.tankerDate), "yyyy-MM-dd"),
+      bookingDate: bookingDateToInput(booking.tankerDate),
       driverId: booking.driverId,
       waterLiters: booking.waterLiters,
       amount: parseFloat(booking.amount),
@@ -90,7 +93,7 @@ export function EditTankerBookingForm({
     setSubmitting(true);
     try {
       await updateTankerBooking(booking.id, {
-        bookingDate: parse(values.bookingDate, "yyyy-MM-dd", new Date()),
+        bookingDate: bookingDateFromInput(values.bookingDate),
         driverId: values.driverId,
         waterLiters: values.waterLiters,
         amount: String(values.amount),

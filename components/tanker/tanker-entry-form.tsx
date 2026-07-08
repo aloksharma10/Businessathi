@@ -4,7 +4,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import {
   ensureTankerDriver,
   type TankerDriverOption,
 } from "@/action/tanker";
+import { bookingDateFromInput } from "@/lib/tanker-date";
 
 function todayInputDate() {
   return format(new Date(), "yyyy-MM-dd");
@@ -94,7 +95,7 @@ export function TankerEntryForm({
       }
 
       await createTankerBooking({
-        bookingDate: parse(values.bookingDate, "yyyy-MM-dd", new Date()),
+        bookingDate: bookingDateFromInput(values.bookingDate),
         driverId: resolvedDriverId,
         waterLiters: values.waterLiters,
         amount: String(values.amount),

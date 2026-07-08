@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
-import type { DateRange } from "react-day-picker";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyForIndia } from "@/lib/utils";
+import { formatBookingDate } from "@/lib/tanker-date";
+import type { DateRange } from "react-day-picker";
 import {
   getDriverBookings,
   type DriverSummaryRow,
@@ -122,7 +122,7 @@ export function DriverBookingsSheet({
                   {bookings.map((b) => (
                     <TableRow key={b.id}>
                       <TableCell>
-                        {format(new Date(b.tankerDate), "dd MMM yyyy")}
+                        {formatBookingDate(b.tankerDate)}
                       </TableCell>
                       <TableCell className="text-right">
                         {b.waterLiters.toLocaleString("en-IN")}
