@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import {
   ChevronRight,
   CircleCheck,
@@ -16,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { TankerDateFilter } from "@/components/tanker/tanker-date-filter";
 import { TankerDriversSettingsButton } from "@/components/tanker/tanker-drivers-settings";
 import { formatCurrencyForIndia } from "@/lib/utils";
+import { formatBookingDate } from "@/lib/tanker-date";
 import type { DateRange } from "react-day-picker";
 import type { DriverSummaryRow, TankerBookingRow } from "@/action/tanker";
 import { Separator } from "../ui/separator";
@@ -223,7 +223,7 @@ export function TankerMobileView({
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(b.tankerDate), "dd MMM yyyy")} •{" "}
+                        {formatBookingDate(b.tankerDate)} •{" "}
                         {b.waterLiters.toLocaleString("en-IN")} L
                       </p>
                       <span className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">

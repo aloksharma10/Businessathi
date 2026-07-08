@@ -43,6 +43,7 @@ model Users {
   plantCustomer          PlantCustomer[]
   plantProduct           PlantProduct[]
   customerProductEntries CustomerProductEntry[]
+  tankerBookings         TankerBooking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -303,6 +304,9 @@ model TankerBooking {
   tanker   Tanker       @relation(fields: [tankerId], references: [id])
   driverId String       @db.ObjectId
   driver   TankerDriver @relation(fields: [driverId], references: [id])
+
+  userId String @db.ObjectId
+  user   Users  @relation(fields: [userId], references: [id])
 
   waterLiters Int    @db.Int
   amount      String @db.String

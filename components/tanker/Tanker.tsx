@@ -1,12 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-} from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { LoaderCircle, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -39,6 +33,11 @@ import {
 import { EditTankerBookingModal } from "@/components/tanker/edit-tanker-booking-modal";
 import { formatCurrencyForIndia } from "@/lib/utils";
 import {
+  formatBookingDate,
+  toUtcDayStart,
+  toUtcDayEnd,
+} from "@/lib/tanker-date";
+import {
   getDriverSummaries,
   getTankerDrivers,
   listTankerBookings,
@@ -49,7 +48,7 @@ import {
 
 function defaultDateRange(): DateRange {
   const today = new Date();
-  return { from: startOfDay(today), to: endOfDay(today) };
+  return { from: toUtcDayStart(today), to: toUtcDayEnd(today) };
 }
 
 export function Tanker({
@@ -362,7 +361,7 @@ export function Tanker({
                         {bookings.map((b) => (
                           <TableRow key={b.id}>
                             <TableCell>
-                              {format(new Date(b.tankerDate), "dd MMM yyyy")}
+                              {formatBookingDate(b.tankerDate)}
                             </TableCell>
                             <TableCell className="font-medium">
                               {b.driverName}

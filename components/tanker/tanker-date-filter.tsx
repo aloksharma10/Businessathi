@@ -1,17 +1,17 @@
 "use client";
 
 import * as React from "react";
-import {
-  endOfDay,
-  format,
-  isSameDay,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { subDays } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
+import {
+  formatBookingDayMonth,
+  isSameUtcDay,
+  toUtcDayEnd,
+  toUtcDayStart,
+} from "@/lib/tanker-date";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -24,28 +24,30 @@ export type TankerDatePreset = "today" | "last7" | "last30" | "custom";
 
 function todayRange(): DateRange {
   const n = new Date();
-  return { from: startOfDay(n), to: endOfDay(n) };
+  return { from: toUtcDayStart(n), to: toUtcDayEnd(n) };
 }
 
 function last7Range(): DateRange {
+  const n = new Date();
   return {
-    from: startOfDay(subDays(new Date(), 6)),
-    to: endOfDay(new Date()),
+    from: toUtcDayStart(subDays(n, 6)),
+    to: toUtcDayEnd(n),
   };
 }
 
 function last30Range(): DateRange {
+  const n = new Date();
   return {
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
+    from: toUtcDayStart(subDays(n, 29)),
+    to: toUtcDayEnd(n),
   };
 }
 
 function rangesMatch(a: DateRange | undefined, b: DateRange): boolean {
   if (!a?.from || !a?.to || !b.from || !b.to) return false;
   return (
-    startOfDay(a.from).getTime() === startOfDay(b.from).getTime() &&
-    endOfDay(a.to).getTime() === endOfDay(b.to).getTime()
+    isSameUtcDay(a.from, b.from) &&
+    isSameUtcDay(a.to, b.to)
   );
 }
 
@@ -60,10 +62,10 @@ export function detectTankerPreset(
 
 export function formatTankerRangeLabel(range: DateRange | undefined): string {
   if (!range?.from) return "Pick dates";
-  if (!range.to || isSameDay(range.from, range.to)) {
-    return format(range.from, "dd MMM");
+  if (!range.to || isSameUtcDay(range.from, range.to)) {
+    return formatBookingDayMonth(range.from);
   }
-  return `${format(range.from, "dd MMM")} – ${format(range.to, "dd MMM")}`;
+  return `${formatBookingDayMonth(range.from)} – ${formatBookingDayMonth(range.to)}`;
 }
 
 const PRESETS: {
@@ -98,6 +100,19 @@ export function TankerDateFilter({
     onChange(preset.getRange());
   };
 
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    if (!range?.from) {
+      onChange(range);
+      return;
+    }
+    const normalized: DateRange = {
+      from: toUtcDayStart(range.from),
+      to: range.to ? toUtcDayEnd(range.to) : undefined,
+    };
+    onChange(normalized);
+    if (normalized.from && normalized.to) setCalendarOpen(false);
+  };
+
   if (variant === "desktop") {
     return (
       <div className={cn("flex flex-col gap-3", className)}>
@@ -130,10 +145,7 @@ export function TankerDateFilter({
                 mode="range"
                 defaultMonth={value?.from ?? new Date()}
                 selected={value}
-                onSelect={(range) => {
-                  onChange(range);
-                  if (range?.from && range?.to) setCalendarOpen(false);
-                }}
+                onSelect={handleCalendarSelect}
                 numberOfMonths={2}
               />
             </PopoverContent>
@@ -170,10 +182,7 @@ export function TankerDateFilter({
               mode="range"
               defaultMonth={value?.from ?? new Date()}
               selected={value}
-              onSelect={(range) => {
-                onChange(range);
-                if (range?.from && range?.to) setCalendarOpen(false);
-              }}
+              onSelect={handleCalendarSelect}
               numberOfMonths={1}
             />
           </PopoverContent>

@@ -1,11 +1,14 @@
 "use server";
 
 import prisma from "@/lib/db";
+import { auth } from "@/auth";
 import {
-  endOfDay,
-  format,
-  startOfDay,
-} from "date-fns";
+  utcDayStart,
+  utcDayEnd,
+  utcMonth,
+  utcYear,
+  utcTankerNo,
+} from "@/lib/tanker-date";
 import { revalidatePath } from "next/cache";
 
 export type TankerDriverOption = {
@@ -39,11 +42,19 @@ function parseAmount(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+async function requireUserId(): Promise<string> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated.");
+  return session.user.id;
+}
+
 function bookingDateFilter(dateFrom?: Date, dateTo?: Date) {
   if (!dateFrom && !dateTo) return undefined;
+  // The client already sends UTC day boundaries; use them as-is so we don't
+  // re-floor across a timezone difference between client and server.
   return {
-    gte: dateFrom ? startOfDay(dateFrom) : undefined,
-    lte: dateTo ? endOfDay(dateTo) : undefined,
+    gte: dateFrom ?? undefined,
+    lte: dateTo ?? undefined,
   };
 }
 
@@ -105,16 +116,16 @@ export async function ensureTankerDriver(rawName: string, rawPhone: string) {
 }
 
 async function findOrCreateTankerForDate(date: Date) {
-  const tankerDate = startOfDay(date);
-  const monthOf = format(tankerDate, "MM");
-  const yearOf = format(tankerDate, "yyyy");
-  const tankerNo = format(tankerDate, "yyyyMMdd");
+  const tankerDate = utcDayStart(date);
+  const monthOf = utcMonth(tankerDate);
+  const yearOf = utcYear(tankerDate);
+  const tankerNo = utcTankerNo(tankerDate);
 
   const existing = await prisma.tanker.findFirst({
     where: {
       tankerDate: {
-        gte: startOfDay(tankerDate),
-        lte: endOfDay(tankerDate),
+        gte: utcDayStart(date),
+        lte: utcDayEnd(date),
       },
     },
   });
@@ -131,8 +142,8 @@ async function upsertMonthlySummary(
   waterLiters: number,
   amount: number
 ) {
-  const monthOf = format(date, "MM");
-  const yearOf = format(date, "yyyy");
+  const monthOf = utcMonth(date);
+  const yearOf = utcYear(date);
 
   const existing = await prisma.tankerDriverMonthlySummary.findFirst({
     where: { driverId, monthOf, yearOf },
@@ -175,6 +186,7 @@ export async function createTankerBooking(params: {
   waterLiters: number;
   amount: string;
 }) {
+  const userId = await requireUserId();
   const liters = Math.max(1, Math.floor(params.waterLiters));
   const amountNum = parseAmount(params.amount);
   if (amountNum <= 0) throw new Error("Amount must be greater than zero.");
@@ -197,6 +209,7 @@ export async function createTankerBooking(params: {
     data: {
       tankerId: tanker.id,
       driverId: driver.id,
+      userId,
       waterLiters: liters,
       amount: String(amountNum),
     },
@@ -219,11 +232,13 @@ export async function listTankerBookings(params: {
   totalCount: number;
   pageCount: number;
 }> {
+  const userId = await requireUserId();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
   const dateFilter = bookingDateFilter(params.dateFrom, params.dateTo);
 
   const where = {
+    userId,
     ...(params.driverId ? { driverId: params.driverId } : {}),
     ...(dateFilter
       ? {
@@ -270,16 +285,20 @@ export async function getDriverSummaries(params: {
   dateFrom?: Date;
   dateTo?: Date;
 }): Promise<DriverSummaryRow[]> {
+  const userId = await requireUserId();
   const dateFilter = bookingDateFilter(params.dateFrom, params.dateTo);
 
   const bookings = await prisma.tankerBooking.findMany({
-    where: dateFilter
-      ? {
-          tanker: {
-            tankerDate: dateFilter,
-          },
-        }
-      : undefined,
+    where: {
+      userId,
+      ...(dateFilter
+        ? {
+            tanker: {
+              tankerDate: dateFilter,
+            },
+          }
+        : {}),
+    },
     include: { driver: true },
   });
 
@@ -364,8 +383,10 @@ export async function updateTankerBooking(
     amount: string;
   }
 ) {
+  const userId = await requireUserId();
   const booking = await prisma.tankerBooking.findUnique({ where: { id } });
   if (!booking) throw new Error("Booking not found.");
+  if (booking.userId !== userId) throw new Error("Booking not found.");
 
   const liters = Math.max(1, Math.floor(params.waterLiters));
   const amountNum = parseAmount(params.amount);
