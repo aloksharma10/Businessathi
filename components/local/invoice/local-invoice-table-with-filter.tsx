@@ -49,13 +49,26 @@ interface FilterState {
   globalSearch?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
+
+const LOCAL_SORT_FIELD_MAP: Record<string, string> = {
+  invoiceNo: "localInvoiceNo",
+  invoiceDate: "localInvoiceDate",
+  customerName: "customer.customerName",
+  address: "customer.address",
+  monthOf: "monthOf",
+};
 
 export const LocalInvoiceTableWithFilter = () => {
   const { onOpen, registerRefreshCallback, unregisterRefreshCallback } =
     useModal();
   const { data: session } = useSession();
-  const [filterState, setFilterState] = useState<FilterState>({});
+  const [filterState, setFilterState] = useState<FilterState>({
+    sortBy: "localInvoiceNo",
+    sortOrder: "desc",
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -70,6 +83,8 @@ export const LocalInvoiceTableWithFilter = () => {
         invoiceType: "local",
         page: 1,
         pageSize: 10,
+        sortBy: "localInvoiceNo",
+        sortOrder: "desc",
       });
     }
   }, [session?.user?.id, filterInvoices]);
@@ -82,6 +97,8 @@ export const LocalInvoiceTableWithFilter = () => {
         page: page,
         pageSize: pageSize,
         ...filterState,
+        sortBy: filterState.sortBy || "localInvoiceNo",
+        sortOrder: filterState.sortOrder || "desc",
       });
     }
   }, [session?.user?.id, page, pageSize, filterState, filterInvoices]);
@@ -94,6 +111,8 @@ export const LocalInvoiceTableWithFilter = () => {
         page: page,
         pageSize: pageSize,
         ...filterState,
+        sortBy: filterState.sortBy || "localInvoiceNo",
+        sortOrder: filterState.sortOrder || "desc",
       });
     }
   }, [session?.user?.id, page, pageSize, filterState, filterInvoices]);
@@ -139,6 +158,28 @@ export const LocalInvoiceTableWithFilter = () => {
     }) => {
       setPage(pageIndex + 1);
       setPageSize(newPageSize);
+    },
+    []
+  );
+
+  const handleSortingChange = useCallback(
+    (sorting: { id: string; desc: boolean }[]) => {
+      if (sorting.length > 0) {
+        const { id, desc } = sorting[0];
+        const mappedSortBy = LOCAL_SORT_FIELD_MAP[id] || id;
+        setFilterState((prev) => ({
+          ...prev,
+          sortBy: mappedSortBy,
+          sortOrder: desc ? "desc" : "asc",
+        }));
+      } else {
+        setFilterState((prev) => ({
+          ...prev,
+          sortBy: "localInvoiceNo",
+          sortOrder: "desc",
+        }));
+      }
+      setPage(1);
     },
     []
   );
@@ -464,7 +505,7 @@ export const LocalInvoiceTableWithFilter = () => {
       <DataTable
         showCalender={false}
         manualPagination={true}
-        manualSorting={false}
+        manualSorting={true}
         manualFiltering={false}
         columns={columns}
         data={invoices}
@@ -502,14 +543,15 @@ export const LocalInvoiceTableWithFilter = () => {
         }}
         defaultSort={[
           {
-            id: "invoiceDate",
-            desc: true,
+            id: "invoiceNo",
+            desc: (filterState.sortOrder || "desc") === "desc",
           },
         ]}
         defaultVisibility={{
           address: true, // Hide address column by default
         }}
         onPaginationChange={handlePaginationChange}
+        onSortingChange={handleSortingChange}
         pageSizeOptions={[10, 25, 50, 100]}
         isLoading={loading}
         isError={false}

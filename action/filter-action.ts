@@ -313,32 +313,83 @@ export const filterInvoices = async (params: InvoiceFilterParams) => {
         where: whereConditions as Prisma.InvoiceWhereInput,
       });
     } else {
-      invoices = (await prisma.localInvoice.findMany({
-        where: whereConditions as Prisma.LocalInvoiceWhereInput,
-        include: {
-          customer: true,
-          pricedProducts: {
-            include: {
-              product: true,
-            },
+      const localWhere = whereConditions as Prisma.LocalInvoiceWhereInput;
+      const localInclude = {
+        customer: true,
+        pricedProducts: {
+          include: {
+            product: true,
           },
         },
-        orderBy:
-          sortBy === "customer.customerName"
-            ? { customer: { customerName: sortOrder } }
-            : sortBy === "customer.address"
-            ? { customer: { address: sortOrder } }
-            : { [sortBy]: sortOrder },
-        skip,
-        take: pageSize,
-      })) as (LocalInvoice & {
-        customer: LocalCustomer;
-        pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
-      })[];
+      } as const;
 
-      totalCount = await prisma.localInvoice.count({
-        where: whereConditions as Prisma.LocalInvoiceWhereInput,
-      });
+      // localInvoiceNo is stored as String — Prisma/Mongo string orderBy is
+      // lexicographic ("1006" sorts after "101"). Sort numerically instead.
+      const isLocalInvoiceNoSort =
+        sortBy === "localInvoiceNo" || sortBy === "invoiceNo";
+
+      if (isLocalInvoiceNoSort) {
+        const allForSort = await prisma.localInvoice.findMany({
+          where: localWhere,
+          select: { id: true, localInvoiceNo: true },
+        });
+
+        const parseInvoiceNo = (value: string) => {
+          const parsed = Number.parseInt(value, 10);
+          return Number.isNaN(parsed) ? 0 : parsed;
+        };
+
+        allForSort.sort((a, b) => {
+          const diff =
+            parseInvoiceNo(a.localInvoiceNo) - parseInvoiceNo(b.localInvoiceNo);
+          return sortOrder === "desc" ? -diff : diff;
+        });
+
+        totalCount = allForSort.length;
+        const pageIds = allForSort
+          .slice(skip, skip + pageSize)
+          .map((invoice) => invoice.id);
+
+        const unordered = (await prisma.localInvoice.findMany({
+          where: { id: { in: pageIds } },
+          include: localInclude,
+        })) as (LocalInvoice & {
+          customer: LocalCustomer;
+          pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+        })[];
+
+        const byId = new Map(unordered.map((invoice) => [invoice.id, invoice]));
+        invoices = pageIds
+          .map((id) => byId.get(id))
+          .filter(
+            (
+              invoice
+            ): invoice is LocalInvoice & {
+              customer: LocalCustomer;
+              pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+            } => Boolean(invoice)
+          );
+      } else {
+        invoices = (await prisma.localInvoice.findMany({
+          where: localWhere,
+          include: localInclude,
+          orderBy:
+            sortBy === "customer.customerName"
+              ? { customer: { customerName: sortOrder } }
+              : sortBy === "customer.address"
+              ? { customer: { address: sortOrder } }
+              : { [sortBy]: sortOrder },
+          skip,
+          take: pageSize,
+        })) as (LocalInvoice & {
+          customer: LocalCustomer;
+          pricedProducts: (LocalCustomPrice & { product: LocalProduct })[];
+        })[];
+
+        totalCount = await prisma.localInvoice.count({
+          where: localWhere,
+        });
+      }
     }
 
     // Transform data to consistent format
