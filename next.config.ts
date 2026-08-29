@@ -1,5 +1,8 @@
 const nextConfig = {
   output: 'standalone',
+  // pdfmake reads its bundled Roboto .ttf files from disk at runtime; keep it
+  // (and its pdfkit dependency) out of the webpack/turbopack bundle.
+  serverExternalPackages: ['pdfmake'],
   images: {
       remotePatterns: [
           {

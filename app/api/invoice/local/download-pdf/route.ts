@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
-
-const BASE_URL =
-  process.env.APP_URL || "https://businessathi.acnexttech.com";
-
+import prisma from "@/lib/db";
+import { localInvoiceDocument } from "@/lib/pdf/local-invoice";
+import { renderPdf } from "@/lib/pdf/pdfmake";
+import {
+  orderByRequest,
+  pdfResponse,
+  requestedInvoiceIds,
+} from "@/lib/pdf/request";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,63 +16,34 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const searchParams = req.nextUrl.searchParams;
-    const invoiceId = searchParams.get("id");
-    const invoiceIds = searchParams.getAll("ids"); // For bulk download
-
-    const invoiceUrls: string[] = [];
-
-    if (invoiceId) {
-      invoiceUrls.push(`${BASE_URL}/local/${invoiceId}/pdf-view`);
-    } else if (invoiceIds.length > 0) {
-      invoiceIds.forEach((id) => {
-        invoiceUrls.push(`${BASE_URL}/local/${id}/pdf-view`);
-      });
-    } else {
+    const ids = requestedInvoiceIds(req.nextUrl.searchParams);
+    if (ids.length === 0) {
       return new NextResponse("Missing invoice ID(s)", { status: 400 });
     }
 
-    if (invoiceUrls.length === 0) {
-      return new NextResponse("Invoice(s) not found or no URLs generated", {
-        status: 404,
-      });
+    const [company, rows] = await Promise.all([
+      prisma.users.findUnique({ where: { id: session.user.id } }),
+      prisma.localInvoice.findMany({
+        where: { id: { in: ids }, userId: session.user.id },
+        include: {
+          customer: true,
+          pricedProducts: { include: { product: true } },
+        },
+      }),
+    ]);
+    const invoices = orderByRequest(ids, rows);
+
+    if (!company || invoices.length === 0) {
+      return new NextResponse("Invoice(s) not found", { status: 404 });
     }
 
-    const browser = await puppeteer.launch({
-      // executablePath: process.env.NODE_ENV === "development" ? "/snap/bin/chromium" : undefined,
-      ...(process.env.NODE_ENV === 'production' ? { executablePath: "/snap/bin/chromium" } : {}),
+    const pdf = await renderPdf(localInvoiceDocument(invoices, company));
+    const filename =
+      invoices.length === 1
+        ? `${invoices[0].localInvoiceNo}.pdf`
+        : "invoices.pdf";
 
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Required for Heroku/Docker deployments
-    });
-    const page = await browser.newPage();
-
-    const mergedPdf = await PDFDocument.create();
-
-    for (const url of invoiceUrls) {
-      await page.goto(url, { waitUntil: "networkidle0" });
-      const pdfBuffer = await page.pdf({
-        format: "A5",
-        printBackground: true,
-      });
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
-      const copiedPages = await mergedPdf.copyPages(
-        pdfDoc,
-        pdfDoc.getPageIndices()
-      );
-      copiedPages.forEach((page) => mergedPdf.addPage(page));
-    }
-
-    await browser.close();
-
-    const finalPdfBytes = await mergedPdf.save();
-
-    return new NextResponse(Buffer.from(finalPdfBytes), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="invoices.pdf"`,
-      },
-    });
+    return pdfResponse(pdf, filename);
   } catch (error) {
     console.error("Error generating PDF:", error);
     return new NextResponse("Failed to generate PDF", { status: 500 });
