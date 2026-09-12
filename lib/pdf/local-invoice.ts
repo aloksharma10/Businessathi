@@ -22,10 +22,15 @@ export type LocalInvoiceForPdf = Prisma.LocalInvoiceGetPayload<{
 }>;
 
 const TIMEZONE = "Asia/Kolkata";
-/** The cash-memo layout keeps the goods table a fixed height; pad short invoices. */
-const MIN_ITEM_ROWS = 29;
-const ROW_HEIGHT = 10.5;
-const ITEM_WIDTHS = [30, "*", 48, 48, 66];
+/**
+ * Blank filler rows stretch the goods table so a typical bill fills the
+ * full A5 page; back off one row per real item.
+ */
+const FILL_ROWS = 24;
+const ROW_HEIGHT = 12.5;
+const fillerRowCount = (itemCount: number): number =>
+  Math.max(0, FILL_ROWS - itemCount);
+const ITEM_WIDTHS = [26, "*", 40, 44, 62];
 
 const centered = (value: string, bold = false): TableCell => ({
   text: value,
@@ -46,7 +51,7 @@ export function localInvoiceDocument(
   return {
     pageSize: "A5",
     pageMargins: [27, 18, 27, 18],
-    defaultStyle: { font: "Roboto", fontSize: 8, lineHeight: 1.0 },
+    defaultStyle: { font: "Roboto", fontSize: 9, lineHeight: 1.05 },
     info: {
       title:
         invoices.length === 1
@@ -71,6 +76,7 @@ export function localInvoiceContent(
     {
       text: "BILL/CASH MEMO",
       bold: true,
+      fontSize: 11,
       alignment: "center",
       margin: [0, 0, 0, 4],
     },
@@ -120,7 +126,7 @@ function partiesSection(
           {
             table: {
               widths: ["50%", "50%"],
-              heights: [24, 24, "auto"],
+              heights: [26, 26, "auto"],
               body: [
                 [
                   labelledValue("Invoice No.", invoice.localInvoiceNo),
@@ -164,7 +170,7 @@ function itemsSection(invoice: LocalInvoiceForPdf): Content {
   ]);
 
   const fillers = Array.from(
-    { length: Math.max(0, MIN_ITEM_ROWS - items.length) },
+    { length: fillerRowCount(items.length) },
     () => blankRow(ITEM_WIDTHS.length)
   );
 
@@ -214,7 +220,7 @@ const amountInWordsSection = (invoice: LocalInvoiceForPdf): Content => ({
 
 const signatureSection = (company: Users): Content => ({
   table: {
-    widths: ["70%", "30%"],
+    widths: ["60%", "40%"],
     body: [
       [
         {
@@ -235,7 +241,7 @@ const signatureSection = (company: Users): Content => ({
             {
               text: "Authorised Signatory",
               alignment: "right",
-              margin: [0, 14, 0, 0],
+              margin: [0, 18, 0, 0],
             },
           ],
         },

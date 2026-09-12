@@ -25,9 +25,15 @@ export type GstInvoiceForPdf = Prisma.InvoiceGetPayload<{
 type Item = GstInvoiceForPdf["pricedProducts"][number];
 
 const TIMEZONE = "Asia/Kolkata";
-/** The Tally-style layout keeps the goods table a fixed height; pad short invoices. */
-const MIN_ITEM_ROWS = 17;
-const ROW_HEIGHT = 11;
+/**
+ * Blank filler rows stretch the goods table so a typical invoice fills the
+ * full A4 page. Every real item also adds a row to the HSN summary below,
+ * so back off two rows per item to keep the bottom edge anchored.
+ */
+const FILL_ROWS = 17;
+const ROW_HEIGHT = 15;
+const fillerRowCount = (itemCount: number): number =>
+  Math.max(0, FILL_ROWS - itemCount * 2);
 const ITEM_WIDTHS = [28, "*", 52, 55, 55, 85];
 
 const centered = (
@@ -48,7 +54,7 @@ export function gstInvoiceDocument(
   return {
     pageSize: "A4",
     pageMargins: [36, 24, 36, 24],
-    defaultStyle: { font: "Roboto", fontSize: 8, lineHeight: 1.1 },
+    defaultStyle: { font: "Roboto", fontSize: 9, lineHeight: 1.15 },
     info: {
       title:
         invoices.length === 1
@@ -96,7 +102,7 @@ export function gstInvoiceContent(
 const heading = (): Content => ({
   columns: [
     { width: "*", text: "" },
-    { width: "auto", text: "TAX INVOICE", bold: true, fontSize: 11 },
+    { width: "auto", text: "TAX INVOICE", bold: true, fontSize: 13 },
     {
       width: "*",
       text: "(ORIGINAL FOR RECIPIENT)",
@@ -151,7 +157,7 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
           {
             table: {
               widths: ["50%", "50%"],
-              heights: [27, 27, 27, "auto"],
+              heights: [30, 30, 30, "auto"],
               body: [
                 [
                   labelledValue("Invoice No.", invoice.invoiceNo),
@@ -205,7 +211,7 @@ function itemsSection(
   ]);
 
   const fillers = Array.from(
-    { length: Math.max(0, MIN_ITEM_ROWS - items.length) },
+    { length: fillerRowCount(items.length) },
     () => blankRow(ITEM_WIDTHS.length)
   );
 
@@ -379,7 +385,7 @@ function bankAndDeclarationSection(
       { text: "Company's Bank Details" },
       {
         table: {
-          widths: ["auto", "auto"],
+          widths: [85, "*"],
           body: [
             [
               { text: "Bank Name" },
@@ -447,7 +453,7 @@ function bankAndDeclarationSection(
               {
                 text: "Authorised Signatory",
                 alignment: "right",
-                margin: [0, 22, 0, 0],
+                margin: [0, 26, 0, 0],
               },
             ],
             border: [true, true, true, true],
