@@ -26,15 +26,25 @@ type Item = GstInvoiceForPdf["pricedProducts"][number];
 
 const TIMEZONE = "Asia/Kolkata";
 /**
- * Blank filler rows stretch the goods table so a typical invoice fills the
- * full A4 page. Every real item also adds a row to the HSN summary below,
- * so back off two rows per item to keep the bottom edge anchored.
+ * The Tally-style layout keeps the goods table a fixed height. Short invoices
+ * are padded with blank rows both above and below the tax rows, which pins the
+ * Total to the bottom edge and leaves the tax lines two-thirds down the page.
  */
-const FILL_ROWS = 17;
-const ROW_HEIGHT = 15;
+const MIN_ITEM_ROWS = 12;
 const fillerRowCount = (itemCount: number): number =>
-  Math.max(0, FILL_ROWS - itemCount * 2);
+  Math.max(0, MIN_ITEM_ROWS - itemCount);
 const ITEM_WIDTHS = [28, "*", 52, 55, 55, 85];
+/**
+ * The goods and HSN tables are pure grids: the old layout let line height
+ * alone set the row pitch, so any vertical cell padding here reads as slack
+ * between the text and its rule.
+ */
+const GRID_PAD = { padX: 2, padY: 0 };
+
+/** The Tally layout wraps addresses well short of the cell edge. */
+const address = (value: string): Content => ({
+  columns: [{ width: 215, text: value }],
+});
 
 const centered = (
   value: string,
@@ -54,7 +64,7 @@ export function gstInvoiceDocument(
   return {
     pageSize: "A4",
     pageMargins: [36, 24, 36, 24],
-    defaultStyle: { font: "Roboto", fontSize: 9, lineHeight: 1.15 },
+    defaultStyle: { font: "Roboto", fontSize: 9.75, lineHeight: 1.1 },
     info: {
       title:
         invoices.length === 1
@@ -118,7 +128,7 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
   const seller: Content = {
     stack: [
       { text: text(company.companyName).toUpperCase(), bold: true },
-      { text: text(company.companyAddress).toUpperCase() },
+      address(text(company.companyAddress).toUpperCase()),
       { text: `GSTIN/UIN : ${text(company.gstNo)}` },
       {
         text: `State Name : ${text(company.state)}, Code : ${stateCode(
@@ -131,7 +141,7 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
     stack: [
       { text: "Buyer (Bill to)" },
       { text: invoice.customer.customerName, bold: true },
-      { text: invoice.customer.address },
+      address(invoice.customer.address),
       { text: `GSTIN/UIN : ${invoice.customer.gstIn}` },
       {
         text: `State Name : ${invoice.customer.state}, Code : ${stateCode(
@@ -147,7 +157,7 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
 
   return {
     table: {
-      widths: ["57%", "43%"],
+      widths: ["56%", "44%"],
       body: [
         [
           {
@@ -157,7 +167,7 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
           {
             table: {
               widths: ["50%", "50%"],
-              heights: [30, 30, 30, "auto"],
+              heights: [27, 27, 27, "auto"],
               body: [
                 [
                   labelledValue("Invoice No.", invoice.invoiceNo),
@@ -210,10 +220,10 @@ function itemsSection(
     { text: item.taxableValue, alignment: "right" },
   ]);
 
-  const fillers = Array.from(
-    { length: fillerRowCount(items.length) },
-    () => blankRow(ITEM_WIDTHS.length)
-  );
+  const fillers = (): TableCell[][] =>
+    Array.from({ length: fillerRowCount(items.length) }, () =>
+      blankRow(ITEM_WIDTHS.length)
+    );
 
   const taxRow = (label: string, amount: number): TableCell[] => [
     { text: "" },
@@ -245,11 +255,13 @@ function itemsSection(
       headerRows: 1,
       dontBreakRows: true,
       widths: ITEM_WIDTHS,
-      heights: () => ROW_HEIGHT,
-      body: [header, ...rows, ...fillers, ...taxRows, totalRow],
+      body: [header, ...rows, ...fillers(), ...taxRows, ...fillers(), totalRow],
     },
     // Rules under the header, above the total and at the bottom only.
-    layout: ruledLayout({ h: (i, n) => i === 1 || i === n - 1 || i === n }),
+    layout: ruledLayout({
+      h: (i, n) => i === 1 || i === n - 1 || i === n,
+      ...GRID_PAD,
+    }),
   };
 }
 
@@ -291,14 +303,14 @@ function hsnSummarySection(
   let totalRow: TableCell[];
 
   if (invoice.isOutsideDelhiInvoice) {
-    widths = ["*", 62, 40, 60, 78];
+    widths = ["*", 57, 31, 52, 57];
     header = [
       [
         centered("HSN/SAC", { rowSpan: 2 }),
-        centered("Taxable Value", { rowSpan: 2 }),
+        centered("Taxable\nValue", { rowSpan: 2 }),
         centered("IGST", { colSpan: 2 }),
         {},
-        centered("Total Tax Amount", { rowSpan: 2 }),
+        centered("Total\nTax Amount", { rowSpan: 2 }),
       ],
       [{}, {}, centered("Rate"), centered("Amount"), {}],
     ];
@@ -321,16 +333,16 @@ function hsnSummarySection(
       centered(fixed2(totalTax), { bold: true }),
     ];
   } else {
-    widths = ["*", 62, 34, 50, 34, 50, 78];
+    widths = ["*", 57, 31, 52, 31, 52, 57];
     header = [
       [
         centered("HSN/SAC", { rowSpan: 2 }),
-        centered("Taxable Value", { rowSpan: 2 }),
+        centered("Taxable\nValue", { rowSpan: 2 }),
         centered("Central Tax", { colSpan: 2 }),
         {},
         centered("State Tax", { colSpan: 2 }),
         {},
-        centered("Total Tax Amount", { rowSpan: 2 }),
+        centered("Total\nTax Amount", { rowSpan: 2 }),
       ],
       [
         {},
@@ -372,7 +384,7 @@ function hsnSummarySection(
       widths,
       body: [...header, ...rows, totalRow],
     },
-    layout: ruledLayout({ h: NO_TOP }),
+    layout: ruledLayout({ h: NO_TOP, ...GRID_PAD }),
   };
 }
 
@@ -385,7 +397,7 @@ function bankAndDeclarationSection(
       { text: "Company's Bank Details" },
       {
         table: {
-          widths: [85, "*"],
+          widths: ["auto", "auto"],
           body: [
             [
               { text: "Bank Name" },
@@ -430,8 +442,15 @@ function bankAndDeclarationSection(
           {},
         ],
         [
-          { text: "", border: [true, false, false, false] },
-          { ...bankDetails, border: [false, false, true, false] },
+          {
+            columns: [
+              { width: "*", text: "" },
+              { width: "auto", ...bankDetails },
+            ],
+            colSpan: 2,
+            border: [true, false, true, false],
+          },
+          {},
         ],
         [
           {
@@ -453,7 +472,7 @@ function bankAndDeclarationSection(
               {
                 text: "Authorised Signatory",
                 alignment: "right",
-                margin: [0, 26, 0, 0],
+                margin: [0, 22, 0, 0],
               },
             ],
             border: [true, true, true, true],
