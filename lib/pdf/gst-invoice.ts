@@ -7,6 +7,7 @@ import type {
   TDocumentDefinitions,
 } from "pdfmake/interfaces";
 import { formatCurrencyForIndia } from "../utils";
+import { renderPdf } from "./pdfmake";
 import { amountInWords, fixed2, num, stateCode, text } from "./format";
 import {
   blankRow,
@@ -25,14 +26,25 @@ export type GstInvoiceForPdf = Prisma.InvoiceGetPayload<{
 type Item = GstInvoiceForPdf["pricedProducts"][number];
 
 const TIMEZONE = "Asia/Kolkata";
+const PAGE_MARGINS: [number, number, number, number] = [36, 15, 36, 14];
+/** Marks an invoice's first and last node for the measuring pass. */
+const headId = (index: number): string => `invoice-head-${index}`;
+const footId = (index: number): string => `invoice-foot-${index}`;
+/** The closing line under the frame, plus the margin above it. */
+const FOOT_HEIGHT = 18;
 /**
- * The Tally-style layout keeps the goods table a fixed height. Short invoices
- * are padded with blank rows both above and below the tax rows, which pins the
- * Total to the bottom edge and leaves the tax lines two-thirds down the page.
+ * The Tally-style layout stretches the goods table with two blank rows — one
+ * above the tax rows and one below — which leaves the tax lines two-thirds
+ * down, pins Total to the bottom edge and carries the ruled frame to the
+ * bottom margin. How far it has to stretch depends on how many lines the two
+ * addresses wrap to, so `renderGstInvoicePdf` lays the invoices out once to
+ * measure the leftover height rather than guessing it from the item count.
+ *
+ * A `heights` entry is a minimum and an empty row already stands ~12.6pt tall,
+ * so a thinner spacer would not shrink to fit: under this the pair is dropped
+ * and the frame falls short instead.
  */
-const MIN_ITEM_ROWS = 12;
-const fillerRowCount = (itemCount: number): number =>
-  Math.max(0, MIN_ITEM_ROWS - itemCount);
+const MIN_SPACER = 14;
 const ITEM_WIDTHS = [28, "*", 52, 55, 55, 85];
 /**
  * The goods and HSN tables are pure grids: the old layout let line height
@@ -57,13 +69,50 @@ const rates = (item: Item) => ({
   sgst: item.sgstRate ?? item.product.sgstRate,
 });
 
-export function gstInvoiceDocument(
+/**
+ * Lays the invoices out once to find how much page is left under each one,
+ * then renders them again with the goods tables stretched to fill it. An
+ * invoice that already spreads over two pages has nothing to fill and is left
+ * as it falls.
+ */
+export async function renderGstInvoicePdf(
   invoices: GstInvoiceForPdf[],
   company: Users
+): Promise<Buffer> {
+  const slack = new Array<number>(invoices.length).fill(0);
+  const startPage = new Map<string, number>();
+
+  await renderPdf({
+    ...gstInvoiceDocument(invoices, company),
+    pageBreakBefore: (node) => {
+      const [, mark, index] =
+        /^invoice-(head|foot)-(\d+)$/.exec(node.id ?? "") ?? [];
+      const at = node.startPosition;
+      if (!at || !mark) {
+        return false;
+      }
+      if (mark === "head") {
+        startPage.set(index, at.pageNumber);
+      } else if (startPage.get(index) === at.pageNumber) {
+        slack[Number(index)] =
+          PAGE_MARGINS[1] + at.pageInnerHeight - FOOT_HEIGHT - at.top;
+      }
+      return false;
+    },
+  });
+
+  return renderPdf(gstInvoiceDocument(invoices, company, slack));
+}
+
+export function gstInvoiceDocument(
+  invoices: GstInvoiceForPdf[],
+  company: Users,
+  /** Unused points left under each invoice; see `renderGstInvoicePdf`. */
+  slack: number[] = []
 ): TDocumentDefinitions {
   return {
     pageSize: "A4",
-    pageMargins: [36, 24, 36, 24],
+    pageMargins: PAGE_MARGINS,
     defaultStyle: { font: "Roboto", fontSize: 9.75, lineHeight: 1.1 },
     info: {
       title:
@@ -75,7 +124,7 @@ export function gstInvoiceDocument(
       producer: "Businessathi",
     },
     content: invoices.map((invoice, index) => ({
-      stack: gstInvoiceContent(invoice, company),
+      stack: gstInvoiceContent(invoice, company, index, slack[index] ?? 0),
       pageBreak: index > 0 ? "before" : undefined,
     })),
   };
@@ -83,7 +132,9 @@ export function gstInvoiceDocument(
 
 export function gstInvoiceContent(
   invoice: GstInvoiceForPdf,
-  company: Users
+  company: Users,
+  index = 0,
+  slack = 0
 ): Content[] {
   const totalCgst = invoice.pricedProducts.reduce(
     (sum, item) => sum + num(item.cgstAmt),
@@ -95,9 +146,9 @@ export function gstInvoiceContent(
   );
 
   return [
-    heading(),
+    heading(index),
     partiesSection(invoice, company),
-    itemsSection(invoice, totalCgst, totalSgst),
+    itemsSection(invoice, totalCgst, totalSgst, slack),
     amountInWordsSection(invoice),
     hsnSummarySection(invoice, totalCgst, totalSgst),
     bankAndDeclarationSection(invoice, company),
@@ -105,14 +156,21 @@ export function gstInvoiceContent(
       text: "This is a Computer Generated Invoice",
       alignment: "center",
       margin: [0, 4, 0, 0],
+      id: footId(index),
     },
   ];
 }
 
-const heading = (): Content => ({
+const heading = (index: number): Content => ({
   columns: [
     { width: "*", text: "" },
-    { width: "auto", text: "TAX INVOICE", bold: true, fontSize: 13 },
+    {
+      width: "auto",
+      text: "TAX INVOICE",
+      bold: true,
+      fontSize: 13,
+      id: headId(index),
+    },
     {
       width: "*",
       text: "(ORIGINAL FOR RECIPIENT)",
@@ -199,7 +257,8 @@ function partiesSection(invoice: GstInvoiceForPdf, company: Users): Content {
 function itemsSection(
   invoice: GstInvoiceForPdf,
   totalCgst: number,
-  totalSgst: number
+  totalSgst: number,
+  slack: number
 ): Content {
   const items = invoice.pricedProducts;
   const header: TableCell[] = [
@@ -219,11 +278,6 @@ function itemsSection(
     centered(item.rate.toFixed(2)),
     { text: item.taxableValue, alignment: "right" },
   ]);
-
-  const fillers = (): TableCell[][] =>
-    Array.from({ length: fillerRowCount(items.length) }, () =>
-      blankRow(ITEM_WIDTHS.length)
-    );
 
   const taxRow = (label: string, amount: number): TableCell[] => [
     { text: "" },
@@ -250,12 +304,24 @@ function itemsSection(
     },
   ];
 
+  const spacerHeight = slack / 2;
+  const spacer =
+    spacerHeight >= MIN_SPACER ? [blankRow(ITEM_WIDTHS.length)] : [];
+  const topSpacer = spacer.length && 1 + rows.length;
+  const bottomSpacer = topSpacer && topSpacer + 1 + taxRows.length;
+
   return {
     table: {
       headerRows: 1,
       dontBreakRows: true,
       widths: ITEM_WIDTHS,
-      body: [header, ...rows, ...fillers(), ...taxRows, ...fillers(), totalRow],
+      // `topSpacer` is 0 — never a body row, the header is row 0 — when the
+      // invoice is being measured or has no room left to fill.
+      heights: (row) =>
+        row !== 0 && (row === topSpacer || row === bottomSpacer)
+          ? spacerHeight
+          : "auto",
+      body: [header, ...rows, ...spacer, ...taxRows, ...spacer, totalRow],
     },
     // Rules under the header, above the total and at the bottom only.
     layout: ruledLayout({

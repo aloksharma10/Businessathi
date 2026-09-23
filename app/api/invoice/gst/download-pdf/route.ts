@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { gstInvoiceDocument } from "@/lib/pdf/gst-invoice";
-import { renderPdf } from "@/lib/pdf/pdfmake";
+import { renderGstInvoicePdf } from "@/lib/pdf/gst-invoice";
 import {
   orderByRequest,
   pdfResponse,
@@ -37,7 +36,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Invoice(s) not found", { status: 404 });
     }
 
-    const pdf = await renderPdf(gstInvoiceDocument(invoices, company));
+    const pdf = await renderGstInvoicePdf(invoices, company);
     const filename =
       invoices.length === 1 ? `${invoices[0].invoiceNo}.pdf` : "invoices.pdf";
 
